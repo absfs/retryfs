@@ -298,3 +298,289 @@ func BenchmarkParallelStat(b *testing.B) {
 		}
 	})
 }
+
+// ==================== Memory Allocation Benchmarks ====================
+// These benchmarks focus on memory allocation overhead
+
+// BenchmarkMemory_Open_NoWrapper measures baseline memory allocations
+func BenchmarkMemory_Open_NoWrapper(b *testing.B) {
+	fs := memfs.New()
+	f, _ := fs.Create("/test.txt")
+	f.Close()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		f, err := fs.Open("/test.txt")
+		if err != nil {
+			b.Fatal(err)
+		}
+		f.Close()
+	}
+}
+
+// BenchmarkMemory_Open_WithRetryFS measures RetryFS overhead
+func BenchmarkMemory_Open_WithRetryFS(b *testing.B) {
+	underlying := memfs.New()
+	fs := New(underlying).(*RetryFS)
+	f, _ := fs.Create("/test.txt")
+	f.Close()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		f, err := fs.Open("/test.txt")
+		if err != nil {
+			b.Fatal(err)
+		}
+		f.Close()
+	}
+}
+
+// BenchmarkMemory_Open_WithCircuitBreaker measures circuit breaker overhead
+func BenchmarkMemory_Open_WithCircuitBreaker(b *testing.B) {
+	underlying := memfs.New()
+	cb := NewCircuitBreaker()
+	fs := New(underlying, WithCircuitBreaker(cb)).(*RetryFS)
+	f, _ := fs.Create("/test.txt")
+	f.Close()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		f, err := fs.Open("/test.txt")
+		if err != nil {
+			b.Fatal(err)
+		}
+		f.Close()
+	}
+}
+
+// BenchmarkMemory_Open_WithPerOpCircuitBreaker measures per-operation circuit breaker overhead
+func BenchmarkMemory_Open_WithPerOpCircuitBreaker(b *testing.B) {
+	underlying := memfs.New()
+	pocb := NewPerOperationCircuitBreaker(nil)
+	fs := New(underlying, WithPerOperationCircuitBreaker(pocb)).(*RetryFS)
+	f, _ := fs.Create("/test.txt")
+	f.Close()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		f, err := fs.Open("/test.txt")
+		if err != nil {
+			b.Fatal(err)
+		}
+		f.Close()
+	}
+}
+
+// BenchmarkMemory_Open_WithLogger measures logging overhead
+func BenchmarkMemory_Open_WithLogger(b *testing.B) {
+	underlying := memfs.New()
+	logger := &NoopLogger{}
+	fs := New(underlying, WithLogger(logger)).(*RetryFS)
+	f, _ := fs.Create("/test.txt")
+	f.Close()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		f, err := fs.Open("/test.txt")
+		if err != nil {
+			b.Fatal(err)
+		}
+		f.Close()
+	}
+}
+
+// BenchmarkMemory_Stat_Comparison compares Stat allocations
+func BenchmarkMemory_Stat_Comparison(b *testing.B) {
+	b.Run("NoWrapper", func(b *testing.B) {
+		fs := memfs.New()
+		f, _ := fs.Create("/test.txt")
+		f.Close()
+
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_, err := fs.Stat("/test.txt")
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+
+	b.Run("WithRetryFS", func(b *testing.B) {
+		underlying := memfs.New()
+		fs := New(underlying).(*RetryFS)
+		f, _ := fs.Create("/test.txt")
+		f.Close()
+
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_, err := fs.Stat("/test.txt")
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+}
+
+// BenchmarkMemory_MkdirAll_Comparison compares MkdirAll allocations
+func BenchmarkMemory_MkdirAll_Comparison(b *testing.B) {
+	b.Run("NoWrapper", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			b.StopTimer()
+			fs := memfs.New()
+			b.StartTimer()
+
+			err := fs.MkdirAll("/test/deep/path", 0755)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+
+	b.Run("WithRetryFS", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			b.StopTimer()
+			underlying := memfs.New()
+			fs := New(underlying).(*RetryFS)
+			b.StartTimer()
+
+			err := fs.MkdirAll("/test/deep/path", 0755)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+}
+
+// BenchmarkMemory_ReadDir measures directory reading allocations
+func BenchmarkMemory_ReadDir(b *testing.B) {
+	b.Run("NoWrapper", func(b *testing.B) {
+		fs := memfs.New()
+		fs.MkdirAll("/test", 0755)
+		for i := 0; i < 10; i++ {
+			f, _ := fs.Create("/test/file" + string(rune('0'+i)) + ".txt")
+			f.Close()
+		}
+
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_, err := fs.ReadDir("/test")
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+
+	b.Run("WithRetryFS", func(b *testing.B) {
+		underlying := memfs.New()
+		fs := New(underlying).(*RetryFS)
+		fs.MkdirAll("/test", 0755)
+		for i := 0; i < 10; i++ {
+			f, _ := fs.Create("/test/file" + string(rune('0'+i)) + ".txt")
+			f.Close()
+		}
+
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_, err := fs.ReadDir("/test")
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+}
+
+// BenchmarkMemory_ContextOperations measures context-aware operation allocations
+func BenchmarkMemory_ContextOperations(b *testing.B) {
+	underlying := memfs.New()
+	fs := New(underlying).(*RetryFS)
+	ctx := context.Background()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = fs.MkdirAllContext(ctx, "/test", 0755)
+	}
+}
+
+// BenchmarkMemory_MetricsRecording measures metrics overhead
+func BenchmarkMemory_MetricsRecording(b *testing.B) {
+	metrics := NewMetrics()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		metrics.RecordAttempt(OpOpen, false)
+		metrics.RecordSuccess(OpOpen)
+	}
+}
+
+// BenchmarkMemory_CircuitBreakerCall measures circuit breaker call overhead
+func BenchmarkMemory_CircuitBreakerCall(b *testing.B) {
+	cb := NewCircuitBreaker()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = cb.Call(func() error {
+			return nil
+		})
+	}
+}
+
+// BenchmarkMemory_ErrorClassifier measures error classification overhead
+func BenchmarkMemory_ErrorClassifier(b *testing.B) {
+	testErrors := []error{
+		fs.ErrNotExist,
+		fs.ErrPermission,
+		errors.New("connection timeout"),
+		errors.New("500 internal server error"),
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = defaultErrorClassifier(testErrors[i%len(testErrors)])
+	}
+}
+
+// BenchmarkMemory_FullStack measures full stack with all features enabled
+func BenchmarkMemory_FullStack(b *testing.B) {
+	underlying := memfs.New()
+	cb := NewCircuitBreaker()
+	logger := &NoopLogger{}
+	fs := New(underlying,
+		WithCircuitBreaker(cb),
+		WithLogger(logger),
+		WithPolicy(&Policy{
+			MaxAttempts: 3,
+			BaseDelay:   1 * time.Millisecond,
+			MaxDelay:    100 * time.Millisecond,
+			Jitter:      0.1,
+			Multiplier:  2.0,
+		}),
+	).(*RetryFS)
+
+	f, _ := fs.Create("/test.txt")
+	f.Close()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		f, err := fs.Open("/test.txt")
+		if err != nil {
+			b.Fatal(err)
+		}
+		f.Close()
+	}
+}

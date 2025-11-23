@@ -17,6 +17,7 @@ type RetryFS struct {
 	metrics                   *Metrics
 	circuitBreaker            *CircuitBreaker
 	perOperationCircuitBreaker *PerOperationCircuitBreaker
+	logger                    Logger
 	mu                        sync.RWMutex
 	rng                       *rand.Rand
 }
@@ -190,6 +191,7 @@ func (rfs *RetryFS) retry(op Operation, fn func() error) error {
 func (rfs *RetryFS) retryWithoutCircuitBreaker(op Operation, fn func() error) error {
 	policy := rfs.config.GetPolicy(op)
 	var lastErr error
+	startTime := time.Now()
 
 	for attempt := 0; attempt < policy.MaxAttempts; attempt++ {
 		// Record the attempt
@@ -204,8 +206,11 @@ func (rfs *RetryFS) retryWithoutCircuitBreaker(op Operation, fn func() error) er
 		}
 
 		// Sleep before retry (not on first attempt)
+		var backoff time.Duration
 		if attempt > 0 {
-			backoff := rfs.calculateBackoff(policy, attempt)
+			backoff = rfs.calculateBackoff(policy, attempt)
+			// Log retry with structured logging
+			rfs.logRetry(op, attempt, lastErr, backoff)
 			time.Sleep(backoff)
 		}
 
@@ -217,6 +222,10 @@ func (rfs *RetryFS) retryWithoutCircuitBreaker(op Operation, fn func() error) er
 			rfs.mu.Lock()
 			rfs.metrics.RecordSuccess(op)
 			rfs.mu.Unlock()
+
+			// Log successful operation
+			duration := time.Since(startTime)
+			rfs.logOperationComplete(op, attempt+1, nil, duration)
 			return nil
 		}
 
@@ -234,6 +243,10 @@ func (rfs *RetryFS) retryWithoutCircuitBreaker(op Operation, fn func() error) er
 	errClass := rfs.config.ErrorClassifier(lastErr)
 	rfs.metrics.RecordFailure(op, errClass)
 	rfs.mu.Unlock()
+
+	// Log failed operation
+	duration := time.Since(startTime)
+	rfs.logOperationComplete(op, policy.MaxAttempts, lastErr, duration)
 
 	return lastErr
 }
