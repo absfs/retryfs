@@ -12,11 +12,12 @@ import (
 
 // RetryFS wraps a billy.Filesystem with automatic retry logic
 type RetryFS struct {
-	fs      billy.Filesystem
-	config  *Config
-	metrics *Metrics
-	mu      sync.RWMutex
-	rng     *rand.Rand
+	fs             billy.Filesystem
+	config         *Config
+	metrics        *Metrics
+	circuitBreaker *CircuitBreaker
+	mu             sync.RWMutex
+	rng            *rand.Rand
 }
 
 // Option is a functional option for configuring RetryFS
@@ -66,11 +67,23 @@ func WithOnRetry(onRetry func(op Operation, attempt int, err error)) Option {
 	}
 }
 
+// WithCircuitBreaker enables circuit breaker protection
+func WithCircuitBreaker(cb *CircuitBreaker) Option {
+	return func(rfs *RetryFS) {
+		rfs.circuitBreaker = cb
+	}
+}
+
 // GetMetrics returns the current metrics
 func (rfs *RetryFS) GetMetrics() *Metrics {
 	rfs.mu.RLock()
 	defer rfs.mu.RUnlock()
 	return rfs.metrics
+}
+
+// GetCircuitBreaker returns the circuit breaker if configured
+func (rfs *RetryFS) GetCircuitBreaker() *CircuitBreaker {
+	return rfs.circuitBreaker
 }
 
 // calculateBackoff calculates the backoff delay for a given attempt
@@ -143,6 +156,17 @@ func (rfs *RetryFS) shouldRetry(err error, attempt int, policy *Policy) bool {
 
 // retry executes a function with retry logic
 func (rfs *RetryFS) retry(op Operation, fn func() error) error {
+	// Wrap with circuit breaker if configured
+	if rfs.circuitBreaker != nil {
+		return rfs.circuitBreaker.Call(func() error {
+			return rfs.retryWithoutCircuitBreaker(op, fn)
+		})
+	}
+	return rfs.retryWithoutCircuitBreaker(op, fn)
+}
+
+// retryWithoutCircuitBreaker executes a function with retry logic (without circuit breaker)
+func (rfs *RetryFS) retryWithoutCircuitBreaker(op Operation, fn func() error) error {
 	policy := rfs.config.GetPolicy(op)
 	var lastErr error
 
