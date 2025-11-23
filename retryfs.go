@@ -12,12 +12,13 @@ import (
 
 // RetryFS wraps a billy.Filesystem with automatic retry logic
 type RetryFS struct {
-	fs             billy.Filesystem
-	config         *Config
-	metrics        *Metrics
-	circuitBreaker *CircuitBreaker
-	mu             sync.RWMutex
-	rng            *rand.Rand
+	fs                        billy.Filesystem
+	config                    *Config
+	metrics                   *Metrics
+	circuitBreaker            *CircuitBreaker
+	perOperationCircuitBreaker *PerOperationCircuitBreaker
+	mu                        sync.RWMutex
+	rng                       *rand.Rand
 }
 
 // Option is a functional option for configuring RetryFS
@@ -74,6 +75,13 @@ func WithCircuitBreaker(cb *CircuitBreaker) Option {
 	}
 }
 
+// WithPerOperationCircuitBreaker enables per-operation circuit breaker protection
+func WithPerOperationCircuitBreaker(pocb *PerOperationCircuitBreaker) Option {
+	return func(rfs *RetryFS) {
+		rfs.perOperationCircuitBreaker = pocb
+	}
+}
+
 // GetMetrics returns the current metrics
 func (rfs *RetryFS) GetMetrics() *Metrics {
 	rfs.mu.RLock()
@@ -84,6 +92,11 @@ func (rfs *RetryFS) GetMetrics() *Metrics {
 // GetCircuitBreaker returns the circuit breaker if configured
 func (rfs *RetryFS) GetCircuitBreaker() *CircuitBreaker {
 	return rfs.circuitBreaker
+}
+
+// GetPerOperationCircuitBreaker returns the per-operation circuit breaker if configured
+func (rfs *RetryFS) GetPerOperationCircuitBreaker() *PerOperationCircuitBreaker {
+	return rfs.perOperationCircuitBreaker
 }
 
 // calculateBackoff calculates the backoff delay for a given attempt
@@ -156,12 +169,20 @@ func (rfs *RetryFS) shouldRetry(err error, attempt int, policy *Policy) bool {
 
 // retry executes a function with retry logic
 func (rfs *RetryFS) retry(op Operation, fn func() error) error {
-	// Wrap with circuit breaker if configured
+	// Wrap with per-operation circuit breaker if configured
+	if rfs.perOperationCircuitBreaker != nil {
+		return rfs.perOperationCircuitBreaker.Call(op, func() error {
+			return rfs.retryWithoutCircuitBreaker(op, fn)
+		})
+	}
+
+	// Wrap with global circuit breaker if configured
 	if rfs.circuitBreaker != nil {
 		return rfs.circuitBreaker.Call(func() error {
 			return rfs.retryWithoutCircuitBreaker(op, fn)
 		})
 	}
+
 	return rfs.retryWithoutCircuitBreaker(op, fn)
 }
 
