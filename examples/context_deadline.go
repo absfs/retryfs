@@ -51,12 +51,13 @@ func main() {
 	}()
 
 	start = time.Now()
-	err = fs.(*retryfs.RetryFS).CreateContext(ctx2, "/data/file.txt")
+	file, err := fs.(*retryfs.RetryFS).CreateContext(ctx2, "/data/file.txt")
 	duration = time.Since(start)
 
 	if err != nil {
 		log.Printf("Operation cancelled: %v (took %v)", err, duration)
 	} else {
+		file.Close()
 		log.Printf("Operation succeeded before cancellation (took %v)", duration)
 	}
 
