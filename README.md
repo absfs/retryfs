@@ -469,6 +469,52 @@ go func() {
 }()
 ```
 
+## Documentation
+
+- **[Best Practices Guide](BEST_PRACTICES.md)** - Production deployment guidelines, configuration recommendations, and common pitfalls
+- **[Examples](examples/)** - Working examples demonstrating various features
+- **API Reference** - See inline documentation and godoc
+
+## Observability
+
+RetryFS provides comprehensive observability features:
+
+### Prometheus Metrics
+
+```go
+collector := retryfs.NewPrometheusCollector(fs, "myapp", "storage")
+prometheus.DefaultRegisterer.MustRegister(collector)
+```
+
+**Available Metrics**:
+- `retryfs_attempts_total{operation}` - Total operation attempts
+- `retryfs_retries_total{operation}` - Retry count per operation
+- `retryfs_successes_total{operation}` - Successful operations
+- `retryfs_failures_total{operation}` - Failed operations (after all retries)
+- `retryfs_errors_total{class}` - Errors by classification
+- `retryfs_circuit_state` - Circuit breaker state (0=closed, 1=open, 2=half-open)
+- `retryfs_circuit_consecutive_errors` - Consecutive error count
+- `retryfs_circuit_consecutive_successes` - Consecutive success count
+
+### Per-Operation Circuit Breakers
+
+For fine-grained control, use per-operation circuit breakers:
+
+```go
+pocb := retryfs.NewPerOperationCircuitBreaker(&retryfs.CircuitBreakerConfig{
+    FailureThreshold: 5,
+    SuccessThreshold: 2,
+    Timeout:          30 * time.Second,
+    OnStateChange: func(op retryfs.Operation, from, to retryfs.State) {
+        log.Printf("[%s] Circuit: %s -> %s", op, from, to)
+    },
+})
+
+fs := retryfs.New(backend, retryfs.WithPerOperationCircuitBreaker(pocb))
+```
+
+This allows reads to continue working even if writes are failing.
+
 ## Contributing
 
 Contributions are welcome! Please see the [AbsFS contribution guidelines](https://github.com/absfs/absfs).
