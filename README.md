@@ -472,6 +472,7 @@ go func() {
 ## Documentation
 
 - **[Best Practices Guide](BEST_PRACTICES.md)** - Production deployment guidelines, configuration recommendations, and common pitfalls
+- **[Integration Testing Guide](INTEGRATION_TESTING.md)** - Comprehensive patterns and examples for integration testing with RetryFS
 - **[Examples](examples/)** - Working examples demonstrating various features
 - **API Reference** - See inline documentation and godoc
 
