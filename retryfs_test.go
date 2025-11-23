@@ -13,6 +13,128 @@ import (
 	"github.com/go-git/go-billy/v5/memfs"
 )
 
+// failingFS wraps a filesystem to simulate failures for testing
+type failingFS struct {
+	fs           billy.Filesystem
+	failuresLeft int
+	failError    error
+}
+
+func newFailingFS(fs billy.Filesystem, failures int) *failingFS {
+	return &failingFS{
+		fs:           fs,
+		failuresLeft: failures,
+		failError:    errors.New("simulated transient failure"),
+	}
+}
+
+func (f *failingFS) shouldFail() bool {
+	if f.failuresLeft > 0 {
+		f.failuresLeft--
+		return true
+	}
+	return false
+}
+
+func (f *failingFS) Create(filename string) (billy.File, error) {
+	if f.shouldFail() {
+		return nil, f.failError
+	}
+	return f.fs.Create(filename)
+}
+
+func (f *failingFS) Open(filename string) (billy.File, error) {
+	if f.shouldFail() {
+		return nil, f.failError
+	}
+	return f.fs.Open(filename)
+}
+
+func (f *failingFS) OpenFile(filename string, flag int, perm fs.FileMode) (billy.File, error) {
+	if f.shouldFail() {
+		return nil, f.failError
+	}
+	return f.fs.OpenFile(filename, flag, perm)
+}
+
+func (f *failingFS) Stat(filename string) (fs.FileInfo, error) {
+	if f.shouldFail() {
+		return nil, f.failError
+	}
+	return f.fs.Stat(filename)
+}
+
+func (f *failingFS) Rename(oldpath, newpath string) error {
+	if f.shouldFail() {
+		return f.failError
+	}
+	return f.fs.Rename(oldpath, newpath)
+}
+
+func (f *failingFS) Remove(filename string) error {
+	if f.shouldFail() {
+		return f.failError
+	}
+	return f.fs.Remove(filename)
+}
+
+func (f *failingFS) Join(elem ...string) string {
+	return f.fs.Join(elem...)
+}
+
+func (f *failingFS) TempFile(dir, prefix string) (billy.File, error) {
+	if f.shouldFail() {
+		return nil, f.failError
+	}
+	return f.fs.TempFile(dir, prefix)
+}
+
+func (f *failingFS) ReadDir(path string) ([]fs.FileInfo, error) {
+	if f.shouldFail() {
+		return nil, f.failError
+	}
+	return f.fs.ReadDir(path)
+}
+
+func (f *failingFS) MkdirAll(filename string, perm fs.FileMode) error {
+	if f.shouldFail() {
+		return f.failError
+	}
+	return f.fs.MkdirAll(filename, perm)
+}
+
+func (f *failingFS) Lstat(filename string) (fs.FileInfo, error) {
+	if f.shouldFail() {
+		return nil, f.failError
+	}
+	return f.fs.Lstat(filename)
+}
+
+func (f *failingFS) Symlink(target, link string) error {
+	if f.shouldFail() {
+		return f.failError
+	}
+	return f.fs.Symlink(target, link)
+}
+
+func (f *failingFS) Readlink(link string) (string, error) {
+	if f.shouldFail() {
+		return "", f.failError
+	}
+	return f.fs.Readlink(link)
+}
+
+func (f *failingFS) Chroot(path string) (billy.Filesystem, error) {
+	if f.shouldFail() {
+		return nil, f.failError
+	}
+	return f.fs.Chroot(path)
+}
+
+func (f *failingFS) Root() string {
+	return f.fs.Root()
+}
+
 func TestCalculateBackoff(t *testing.T) {
 	policy := &Policy{
 		BaseDelay:  100 * time.Millisecond,
