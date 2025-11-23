@@ -25,8 +25,8 @@ func main() {
 	config := &retryfs.Config{
 		DefaultPolicy: customPolicy,
 		OperationPolicies: map[retryfs.Operation]*retryfs.Policy{
-			// More retries for read operations (they're cheap)
-			retryfs.OpRead: {
+			// More retries for open operations (they're cheap)
+			retryfs.OpOpen: {
 				MaxAttempts: 15,
 				BaseDelay:   25 * time.Millisecond,
 				MaxDelay:    3 * time.Second,

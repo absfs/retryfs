@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"time"
 
 	"github.com/absfs/retryfs"
 	"github.com/go-git/go-billy/v5/memfs"
