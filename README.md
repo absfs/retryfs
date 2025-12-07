@@ -1,5 +1,10 @@
 # retryfs
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/absfs/retryfs.svg)](https://pkg.go.dev/github.com/absfs/retryfs)
+[![Go Report Card](https://goreportcard.com/badge/github.com/absfs/retryfs)](https://goreportcard.com/report/github.com/absfs/retryfs)
+[![CI](https://github.com/absfs/retryfs/actions/workflows/ci.yml/badge.svg)](https://github.com/absfs/retryfs/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Automatic retry with exponential backoff for network filesystems in the AbsFS ecosystem.
 
 ## Overview
