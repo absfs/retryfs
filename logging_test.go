@@ -4,11 +4,30 @@ import (
 	"bytes"
 	"log/slog"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/go-git/go-billy/v5/memfs"
 )
+
+// safeBuffer is a thread-safe bytes.Buffer wrapper
+type safeBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (sb *safeBuffer) Write(p []byte) (n int, err error) {
+	sb.mu.Lock()
+	defer sb.mu.Unlock()
+	return sb.buf.Write(p)
+}
+
+func (sb *safeBuffer) String() string {
+	sb.mu.Lock()
+	defer sb.mu.Unlock()
+	return sb.buf.String()
+}
 
 func TestSlogLogger(t *testing.T) {
 	var buf bytes.Buffer
@@ -109,7 +128,7 @@ func TestRetryFS_LoggingWithRetries(t *testing.T) {
 }
 
 func TestRetryFS_LoggingWithCircuitBreaker(t *testing.T) {
-	var buf bytes.Buffer
+	var buf safeBuffer
 	handler := slog.NewTextHandler(&buf, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	})
@@ -150,7 +169,7 @@ func TestRetryFS_LoggingWithCircuitBreaker(t *testing.T) {
 }
 
 func TestRetryFS_LoggingWithPerOperationCircuitBreaker(t *testing.T) {
-	var buf bytes.Buffer
+	var buf safeBuffer
 	handler := slog.NewTextHandler(&buf, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	})

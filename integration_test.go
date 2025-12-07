@@ -360,7 +360,6 @@ func TestIntegration_CircuitBreakerTrip(t *testing.T) {
 
 	var stateChanges int32
 	cb.OnStateChange = func(from, to State) {
-		t.Logf("Circuit breaker: %s -> %s", from, to)
 		atomic.AddInt32(&stateChanges, 1)
 	}
 
