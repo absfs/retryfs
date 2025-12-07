@@ -231,6 +231,7 @@ func TestPerOperationCircuitBreaker_ResetOperation(t *testing.T) {
 
 func TestPerOperationCircuitBreaker_OnStateChange(t *testing.T) {
 	var stateChanges int32
+	var mu sync.Mutex
 	var lastOp Operation
 
 	pocb := NewPerOperationCircuitBreaker(&CircuitBreakerConfig{
@@ -239,8 +240,9 @@ func TestPerOperationCircuitBreaker_OnStateChange(t *testing.T) {
 		Timeout:          50 * time.Millisecond,
 		OnStateChange: func(op Operation, from, to State) {
 			atomic.AddInt32(&stateChanges, 1)
+			mu.Lock()
 			lastOp = op
-			t.Logf("Operation %s: %s -> %s", op, from, to)
+			mu.Unlock()
 		},
 	})
 
@@ -258,8 +260,12 @@ func TestPerOperationCircuitBreaker_OnStateChange(t *testing.T) {
 		t.Error("Expected state change callback to be called")
 	}
 
-	if lastOp != OpOpen {
-		t.Errorf("Expected last operation to be OpOpen, got: %s", lastOp)
+	mu.Lock()
+	opCopy := lastOp
+	mu.Unlock()
+
+	if opCopy != OpOpen {
+		t.Errorf("Expected last operation to be OpOpen, got: %s", opCopy)
 	}
 }
 

@@ -138,7 +138,6 @@ func TestLoadTest_CircuitBreakerUnderLoad(t *testing.T) {
 	cb.FailureThreshold = 5
 	cb.OnStateChange = func(from, to State) {
 		atomic.AddInt64(&cbStateChanges, 1)
-		t.Logf("Circuit breaker: %s -> %s", from, to)
 	}
 
 	fs := New(underlying,
@@ -163,15 +162,15 @@ func TestLoadTest_CircuitBreakerUnderLoad(t *testing.T) {
 		}
 	}
 
-	t.Logf("Circuit Breaker Load Test Results:")
-	t.Logf("  Failed Operations: %d", failedOps)
-	t.Logf("  State Changes: %d", cbStateChanges)
-	t.Logf("  Final State: %s", cb.GetState())
-
 	// Wait for async callback
 	time.Sleep(100 * time.Millisecond)
 
-	if cbStateChanges == 0 {
+	t.Logf("Circuit Breaker Load Test Results:")
+	t.Logf("  Failed Operations: %d", atomic.LoadInt64(&failedOps))
+	t.Logf("  State Changes: %d", atomic.LoadInt64(&cbStateChanges))
+	t.Logf("  Final State: %s", cb.GetState())
+
+	if atomic.LoadInt64(&cbStateChanges) == 0 {
 		t.Error("Expected circuit breaker to change state under high failure rate")
 	}
 }
@@ -192,7 +191,6 @@ func TestLoadTest_PerOperationCircuitBreaker(t *testing.T) {
 		Timeout:          100 * time.Millisecond,
 		OnStateChange: func(op Operation, from, to State) {
 			atomic.AddInt64(&stateChanges, 1)
-			t.Logf("Per-op CB [%s]: %s -> %s", op, from, to)
 		},
 	})
 

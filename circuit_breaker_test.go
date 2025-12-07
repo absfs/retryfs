@@ -2,6 +2,7 @@ package retryfs
 
 import (
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -197,13 +198,16 @@ func TestCircuitBreakerSuccessResetsFailureCount(t *testing.T) {
 }
 
 func TestCircuitBreakerStateChangeCallback(t *testing.T) {
+	var mu sync.Mutex
 	var transitions []string
 	cb := &CircuitBreaker{
 		FailureThreshold: 2,
 		SuccessThreshold: 1,
 		Timeout:          50 * time.Millisecond,
 		OnStateChange: func(from, to State) {
+			mu.Lock()
 			transitions = append(transitions, from.String()+"->"+to.String())
+			mu.Unlock()
 		},
 	}
 
@@ -224,20 +228,26 @@ func TestCircuitBreakerStateChangeCallback(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// Verify transitions
-	if len(transitions) < 2 {
-		t.Errorf("Expected at least 2 transitions, got %d: %v", len(transitions), transitions)
+	mu.Lock()
+	transCount := len(transitions)
+	var transCopy []string
+	transCopy = append(transCopy, transitions...)
+	mu.Unlock()
+
+	if transCount < 2 {
+		t.Errorf("Expected at least 2 transitions, got %d: %v", transCount, transCopy)
 	}
 
 	// Should have seen closed->open and half-open->closed (or open->half-open)
 	hasClosedToOpen := false
-	for _, trans := range transitions {
+	for _, trans := range transCopy {
 		if trans == "closed->open" {
 			hasClosedToOpen = true
 		}
 	}
 
 	if !hasClosedToOpen {
-		t.Errorf("Expected to see closed->open transition, got %v", transitions)
+		t.Errorf("Expected to see closed->open transition, got %v", transCopy)
 	}
 }
 
