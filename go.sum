@@ -6,8 +6,8 @@ github.com/absfs/inode v0.0.0-20251208170702-9db24ab95ae4 h1:on/poHeOcUsAivcRifj
 github.com/absfs/inode v0.0.0-20251208170702-9db24ab95ae4/go.mod h1:98Uz4QOknMBXXWwXUIs2TzSwuz+9mbSAKASbwF1eld8=
 github.com/absfs/lockfs v0.0.0-20251124210544-241704814c03 h1:CnVf8nV/DHhbspnqdiF/KYcenfIDT4zcNhJY7w3PdUE=
 github.com/absfs/lockfs v0.0.0-20251124210544-241704814c03/go.mod h1:HVN3eRlj4K900z7171bfd7cUM2iyUM8q0YetQDgfbOY=
-github.com/absfs/memfs v0.0.0-20251208172314-c3af0b857987 h1:uq8xnEFLtRJQnTvpEsHY9THTRbG2UraU9vK3OKqGnXE=
-github.com/absfs/memfs v0.0.0-20251208172314-c3af0b857987/go.mod h1:dWXSbjtZMhv7kAvIWSTciq9bq8r4Ez74uGqpKQ9DAc8=
+github.com/absfs/memfs v0.0.0-20251208230836-c6633f45580a h1:qlUfgzRrIAX5uuFVZ0IGriYtDCXcmzVF0EezCESG6PM=
+github.com/absfs/memfs v0.0.0-20251208230836-c6633f45580a/go.mod h1:QU7ybM+nxDnWEYxAeBOrixMS97lAkpMf4jSGtXq4l3M=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=

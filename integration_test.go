@@ -330,9 +330,7 @@ func TestIntegration_HighFailureRate(t *testing.T) {
 }
 
 // TestIntegration_ConcurrentOperations tests concurrent operations with failures
-// Skipped because memfs is not thread-safe
 func TestIntegration_ConcurrentOperations(t *testing.T) {
-	t.Skip("Skipping concurrent test - underlying memfs is not thread-safe")
 	chaos := newChaosFS(mustNewMemFS(), 0.2) // 20% failure rate
 
 	fs := New(chaos, WithPolicy(&Policy{

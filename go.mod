@@ -1,10 +1,10 @@
 module github.com/absfs/retryfs
 
-go 1.21
+go 1.25.4
 
 require (
 	github.com/absfs/absfs v0.0.0-20251208163131-5313f0098c48
-	github.com/absfs/memfs v0.0.0-20251208172314-c3af0b857987
+	github.com/absfs/memfs v0.0.0-20251208230836-c6633f45580a
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.2
 )
