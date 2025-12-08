@@ -8,8 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-git/go-billy/v5/memfs"
 )
+
+
 
 // safeBuffer is a thread-safe bytes.Buffer wrapper
 type safeBuffer struct {
@@ -79,7 +80,7 @@ func TestRetryFS_WithLogger(t *testing.T) {
 	slogger := slog.New(handler)
 	logger := NewSlogLogger(slogger)
 
-	underlying := memfs.New()
+	underlying := mustNewMemFS()
 	fs := New(underlying, WithLogger(logger)).(*RetryFS)
 
 	if fs.logger == nil {
@@ -104,7 +105,7 @@ func TestRetryFS_LoggingWithRetries(t *testing.T) {
 	logger := NewSlogLogger(slogger)
 
 	// Create filesystem that fails twice
-	failing := newFailingFS(memfs.New(), 2)
+	failing := newFailingFS(mustNewMemFS(), 2)
 	fs := New(failing,
 		WithLogger(logger),
 		WithPolicy(&Policy{
@@ -141,7 +142,7 @@ func TestRetryFS_LoggingWithCircuitBreaker(t *testing.T) {
 		logCircuitBreakerStateChange(logger, from, to)
 	}
 
-	underlying := newFailingFS(memfs.New(), 10) // Always fail
+	underlying := newFailingFS(mustNewMemFS(), 10) // Always fail
 	fs := New(underlying,
 		WithLogger(logger),
 		WithCircuitBreaker(cb),
@@ -185,7 +186,7 @@ func TestRetryFS_LoggingWithPerOperationCircuitBreaker(t *testing.T) {
 		},
 	})
 
-	underlying := newFailingFS(memfs.New(), 10) // Always fail
+	underlying := newFailingFS(mustNewMemFS(), 10) // Always fail
 	fs := New(underlying,
 		WithLogger(logger),
 		WithPerOperationCircuitBreaker(pocb),
@@ -213,7 +214,7 @@ func TestRetryFS_LoggingWithPerOperationCircuitBreaker(t *testing.T) {
 }
 
 func TestRetryFS_WithoutLogger(t *testing.T) {
-	underlying := memfs.New()
+	underlying := mustNewMemFS()
 	fs := New(underlying).(*RetryFS)
 
 	// Should not panic when logger is nil

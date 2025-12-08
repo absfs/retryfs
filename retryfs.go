@@ -1,18 +1,18 @@
 package retryfs
 
 import (
-	"io/fs"
 	"math"
 	"math/rand"
+	"os"
 	"sync"
 	"time"
 
-	"github.com/go-git/go-billy/v5"
+	"github.com/absfs/absfs"
 )
 
-// RetryFS wraps a billy.Filesystem with automatic retry logic
+// RetryFS wraps an absfs.FileSystem with automatic retry logic
 type RetryFS struct {
-	fs                        billy.Filesystem
+	fs                        absfs.FileSystem
 	config                    *Config
 	metrics                   *Metrics
 	circuitBreaker            *CircuitBreaker
@@ -26,7 +26,7 @@ type RetryFS struct {
 type Option func(*RetryFS)
 
 // New creates a new RetryFS wrapping the given filesystem
-func New(fs billy.Filesystem, options ...Option) billy.Filesystem {
+func New(fs absfs.FileSystem, options ...Option) absfs.FileSystem {
 	rfs := &RetryFS{
 		fs:      fs,
 		config:  DefaultConfig(),
@@ -272,111 +272,165 @@ func retryWithResult[T any](rfs *RetryFS, op Operation, fn func() (T, error)) (T
 	return result, resultErr
 }
 
-// Create implements billy.Filesystem
-func (rfs *RetryFS) Create(filename string) (billy.File, error) {
-	return retryWithResult(rfs, OpCreate, func() (billy.File, error) {
+// Create implements absfs.FileSystem
+func (rfs *RetryFS) Create(filename string) (absfs.File, error) {
+	return retryWithResult(rfs, OpCreate, func() (absfs.File, error) {
 		return rfs.fs.Create(filename)
 	})
 }
 
-// Open implements billy.Filesystem
-func (rfs *RetryFS) Open(filename string) (billy.File, error) {
-	return retryWithResult(rfs, OpOpen, func() (billy.File, error) {
+// Open implements absfs.FileSystem
+func (rfs *RetryFS) Open(filename string) (absfs.File, error) {
+	return retryWithResult(rfs, OpOpen, func() (absfs.File, error) {
 		return rfs.fs.Open(filename)
 	})
 }
 
-// OpenFile implements billy.Filesystem
-func (rfs *RetryFS) OpenFile(filename string, flag int, perm fs.FileMode) (billy.File, error) {
-	return retryWithResult(rfs, OpOpenFile, func() (billy.File, error) {
+// OpenFile implements absfs.FileSystem
+func (rfs *RetryFS) OpenFile(filename string, flag int, perm os.FileMode) (absfs.File, error) {
+	return retryWithResult(rfs, OpOpenFile, func() (absfs.File, error) {
 		return rfs.fs.OpenFile(filename, flag, perm)
 	})
 }
 
-// Stat implements billy.Filesystem
-func (rfs *RetryFS) Stat(filename string) (fs.FileInfo, error) {
-	return retryWithResult(rfs, OpStat, func() (fs.FileInfo, error) {
+// Stat implements absfs.FileSystem
+func (rfs *RetryFS) Stat(filename string) (os.FileInfo, error) {
+	return retryWithResult(rfs, OpStat, func() (os.FileInfo, error) {
 		return rfs.fs.Stat(filename)
 	})
 }
 
-// Rename implements billy.Filesystem
+// Rename implements absfs.FileSystem
 func (rfs *RetryFS) Rename(oldpath, newpath string) error {
 	return rfs.retry(OpRename, func() error {
 		return rfs.fs.Rename(oldpath, newpath)
 	})
 }
 
-// Remove implements billy.Filesystem
+// Remove implements absfs.FileSystem
 func (rfs *RetryFS) Remove(filename string) error {
 	return rfs.retry(OpRemove, func() error {
 		return rfs.fs.Remove(filename)
 	})
 }
 
-// Join implements billy.Filesystem
-func (rfs *RetryFS) Join(elem ...string) string {
-	// Join is a pure function, no retry needed
-	return rfs.fs.Join(elem...)
-}
-
-// TempFile implements billy.Filesystem
-func (rfs *RetryFS) TempFile(dir, prefix string) (billy.File, error) {
-	return retryWithResult(rfs, OpTempFile, func() (billy.File, error) {
-		return rfs.fs.TempFile(dir, prefix)
-	})
-}
-
-// ReadDir implements billy.Filesystem
-func (rfs *RetryFS) ReadDir(path string) ([]fs.FileInfo, error) {
-	return retryWithResult(rfs, OpReadDir, func() ([]fs.FileInfo, error) {
-		return rfs.fs.ReadDir(path)
-	})
-}
-
-// MkdirAll implements billy.Filesystem
-func (rfs *RetryFS) MkdirAll(filename string, perm fs.FileMode) error {
+// MkdirAll implements absfs.FileSystem
+func (rfs *RetryFS) MkdirAll(filename string, perm os.FileMode) error {
 	return rfs.retry(OpMkdirAll, func() error {
 		return rfs.fs.MkdirAll(filename, perm)
 	})
 }
 
-// Lstat implements billy.Filesystem
-func (rfs *RetryFS) Lstat(filename string) (fs.FileInfo, error) {
-	return retryWithResult(rfs, OpLstat, func() (fs.FileInfo, error) {
-		return rfs.fs.Lstat(filename)
+// Mkdir implements absfs.FileSystem
+func (rfs *RetryFS) Mkdir(name string, perm os.FileMode) error {
+	return rfs.retry(OpMkdir, func() error {
+		return rfs.fs.Mkdir(name, perm)
 	})
 }
 
-// Symlink implements billy.Filesystem
-func (rfs *RetryFS) Symlink(target, link string) error {
-	return rfs.retry(OpSymlink, func() error {
-		return rfs.fs.Symlink(target, link)
+// RemoveAll implements absfs.FileSystem
+func (rfs *RetryFS) RemoveAll(path string) error {
+	return rfs.retry(OpRemoveAll, func() error {
+		return rfs.fs.RemoveAll(path)
 	})
 }
 
-// Readlink implements billy.Filesystem
-func (rfs *RetryFS) Readlink(link string) (string, error) {
-	return retryWithResult(rfs, OpReadlink, func() (string, error) {
-		return rfs.fs.Readlink(link)
+// Chmod implements absfs.FileSystem
+func (rfs *RetryFS) Chmod(name string, mode os.FileMode) error {
+	return rfs.retry(OpChmod, func() error {
+		return rfs.fs.Chmod(name, mode)
 	})
 }
 
-// Chroot implements billy.Filesystem
-func (rfs *RetryFS) Chroot(path string) (billy.Filesystem, error) {
-	// Chroot creates a new filesystem, wrap the result
-	return retryWithResult(rfs, OpChroot, func() (billy.Filesystem, error) {
-		chrootedFs, err := rfs.fs.Chroot(path)
-		if err != nil {
-			return nil, err
-		}
-		// Wrap the chrooted filesystem with retry logic
-		return New(chrootedFs, WithConfig(rfs.config)), nil
+// Chtimes implements absfs.FileSystem
+func (rfs *RetryFS) Chtimes(name string, atime time.Time, mtime time.Time) error {
+	return rfs.retry(OpChtimes, func() error {
+		return rfs.fs.Chtimes(name, atime, mtime)
 	})
 }
 
-// Root implements billy.Filesystem
-func (rfs *RetryFS) Root() string {
-	// Root is a pure function, no retry needed
-	return rfs.fs.Root()
+// Chown implements absfs.FileSystem
+func (rfs *RetryFS) Chown(name string, uid, gid int) error {
+	return rfs.retry(OpChown, func() error {
+		return rfs.fs.Chown(name, uid, gid)
+	})
+}
+
+// Separator implements absfs.FileSystem
+func (rfs *RetryFS) Separator() uint8 {
+	return rfs.fs.Separator()
+}
+
+// ListSeparator implements absfs.FileSystem
+func (rfs *RetryFS) ListSeparator() uint8 {
+	return rfs.fs.ListSeparator()
+}
+
+// Chdir implements absfs.FileSystem
+func (rfs *RetryFS) Chdir(dir string) error {
+	return rfs.retry(OpChdir, func() error {
+		return rfs.fs.Chdir(dir)
+	})
+}
+
+// Getwd implements absfs.FileSystem
+func (rfs *RetryFS) Getwd() (string, error) {
+	return retryWithResult(rfs, OpGetwd, func() (string, error) {
+		return rfs.fs.Getwd()
+	})
+}
+
+// TempDir implements absfs.FileSystem
+func (rfs *RetryFS) TempDir() string {
+	return rfs.fs.TempDir()
+}
+
+// Truncate implements absfs.FileSystem
+func (rfs *RetryFS) Truncate(name string, size int64) error {
+	return rfs.retry(OpTruncate, func() error {
+		return rfs.fs.Truncate(name, size)
+	})
+}
+
+// Symlink operations - only available if the underlying filesystem supports them
+
+// Lstat implements absfs.SymLinker
+func (rfs *RetryFS) Lstat(name string) (os.FileInfo, error) {
+	if sl, ok := rfs.fs.(absfs.SymLinker); ok {
+		return retryWithResult(rfs, OpLstat, func() (os.FileInfo, error) {
+			return sl.Lstat(name)
+		})
+	}
+	// Fall back to Stat if symlinks not supported
+	return rfs.Stat(name)
+}
+
+// Lchown implements absfs.SymLinker
+func (rfs *RetryFS) Lchown(name string, uid, gid int) error {
+	if sl, ok := rfs.fs.(absfs.SymLinker); ok {
+		return rfs.retry(OpLchown, func() error {
+			return sl.Lchown(name, uid, gid)
+		})
+	}
+	return absfs.ErrNotImplemented
+}
+
+// Readlink implements absfs.SymLinker
+func (rfs *RetryFS) Readlink(name string) (string, error) {
+	if sl, ok := rfs.fs.(absfs.SymLinker); ok {
+		return retryWithResult(rfs, OpReadlink, func() (string, error) {
+			return sl.Readlink(name)
+		})
+	}
+	return "", absfs.ErrNotImplemented
+}
+
+// Symlink implements absfs.SymLinker
+func (rfs *RetryFS) Symlink(oldname, newname string) error {
+	if sl, ok := rfs.fs.(absfs.SymLinker); ok {
+		return rfs.retry(OpSymlink, func() error {
+			return sl.Symlink(oldname, newname)
+		})
+	}
+	return absfs.ErrNotImplemented
 }

@@ -2,10 +2,10 @@ package retryfs
 
 import (
 	"context"
-	"io/fs"
+	"os"
 	"time"
 
-	"github.com/go-git/go-billy/v5"
+	"github.com/absfs/absfs"
 )
 
 // retryWithContext executes a function with retry logic and context support
@@ -106,29 +106,29 @@ func retryWithResultContext[T any](rfs *RetryFS, ctx context.Context, op Operati
 }
 
 // CreateContext creates a file with context support
-func (rfs *RetryFS) CreateContext(ctx context.Context, filename string) (billy.File, error) {
-	return retryWithResultContext(rfs, ctx, OpCreate, func() (billy.File, error) {
+func (rfs *RetryFS) CreateContext(ctx context.Context, filename string) (absfs.File, error) {
+	return retryWithResultContext(rfs, ctx, OpCreate, func() (absfs.File, error) {
 		return rfs.fs.Create(filename)
 	})
 }
 
 // OpenContext opens a file with context support
-func (rfs *RetryFS) OpenContext(ctx context.Context, filename string) (billy.File, error) {
-	return retryWithResultContext(rfs, ctx, OpOpen, func() (billy.File, error) {
+func (rfs *RetryFS) OpenContext(ctx context.Context, filename string) (absfs.File, error) {
+	return retryWithResultContext(rfs, ctx, OpOpen, func() (absfs.File, error) {
 		return rfs.fs.Open(filename)
 	})
 }
 
 // OpenFileContext opens a file with flags and permissions with context support
-func (rfs *RetryFS) OpenFileContext(ctx context.Context, filename string, flag int, perm fs.FileMode) (billy.File, error) {
-	return retryWithResultContext(rfs, ctx, OpOpenFile, func() (billy.File, error) {
+func (rfs *RetryFS) OpenFileContext(ctx context.Context, filename string, flag int, perm os.FileMode) (absfs.File, error) {
+	return retryWithResultContext(rfs, ctx, OpOpenFile, func() (absfs.File, error) {
 		return rfs.fs.OpenFile(filename, flag, perm)
 	})
 }
 
 // StatContext returns file info with context support
-func (rfs *RetryFS) StatContext(ctx context.Context, filename string) (fs.FileInfo, error) {
-	return retryWithResultContext(rfs, ctx, OpStat, func() (fs.FileInfo, error) {
+func (rfs *RetryFS) StatContext(ctx context.Context, filename string) (os.FileInfo, error) {
+	return retryWithResultContext(rfs, ctx, OpStat, func() (os.FileInfo, error) {
 		return rfs.fs.Stat(filename)
 	})
 }
@@ -147,92 +147,75 @@ func (rfs *RetryFS) RemoveContext(ctx context.Context, filename string) error {
 	})
 }
 
-// TempFileContext creates a temporary file with context support
-func (rfs *RetryFS) TempFileContext(ctx context.Context, dir, prefix string) (billy.File, error) {
-	return retryWithResultContext(rfs, ctx, OpTempFile, func() (billy.File, error) {
-		return rfs.fs.TempFile(dir, prefix)
-	})
-}
-
-// ReadDirContext reads a directory with context support
-func (rfs *RetryFS) ReadDirContext(ctx context.Context, path string) ([]fs.FileInfo, error) {
-	return retryWithResultContext(rfs, ctx, OpReadDir, func() ([]fs.FileInfo, error) {
-		return rfs.fs.ReadDir(path)
-	})
-}
-
 // MkdirAllContext creates a directory tree with context support
-func (rfs *RetryFS) MkdirAllContext(ctx context.Context, filename string, perm fs.FileMode) error {
+func (rfs *RetryFS) MkdirAllContext(ctx context.Context, filename string, perm os.FileMode) error {
 	return rfs.retryWithContext(ctx, OpMkdirAll, func() error {
 		return rfs.fs.MkdirAll(filename, perm)
 	})
 }
 
 // LstatContext returns file info without following symlinks with context support
-func (rfs *RetryFS) LstatContext(ctx context.Context, filename string) (fs.FileInfo, error) {
-	return retryWithResultContext(rfs, ctx, OpLstat, func() (fs.FileInfo, error) {
-		return rfs.fs.Lstat(filename)
+func (rfs *RetryFS) LstatContext(ctx context.Context, filename string) (os.FileInfo, error) {
+	sl, ok := rfs.fs.(absfs.SymLinker)
+	if !ok {
+		// Fall back to Stat if symlinks not supported
+		return rfs.StatContext(ctx, filename)
+	}
+	return retryWithResultContext(rfs, ctx, OpLstat, func() (os.FileInfo, error) {
+		return sl.Lstat(filename)
 	})
 }
 
 // SymlinkContext creates a symbolic link with context support
 func (rfs *RetryFS) SymlinkContext(ctx context.Context, target, link string) error {
+	sl, ok := rfs.fs.(absfs.SymLinker)
+	if !ok {
+		return &os.PathError{Op: "symlink", Path: link, Err: absfs.ErrNotImplemented}
+	}
 	return rfs.retryWithContext(ctx, OpSymlink, func() error {
-		return rfs.fs.Symlink(target, link)
+		return sl.Symlink(target, link)
 	})
 }
 
 // ReadlinkContext reads a symbolic link with context support
 func (rfs *RetryFS) ReadlinkContext(ctx context.Context, link string) (string, error) {
+	sl, ok := rfs.fs.(absfs.SymLinker)
+	if !ok {
+		return "", &os.PathError{Op: "readlink", Path: link, Err: absfs.ErrNotImplemented}
+	}
 	return retryWithResultContext(rfs, ctx, OpReadlink, func() (string, error) {
-		return rfs.fs.Readlink(link)
+		return sl.Readlink(link)
 	})
 }
 
 // ChmodContext changes file mode with context support
-func (rfs *RetryFS) ChmodContext(ctx context.Context, name string, mode fs.FileMode) error {
-	changer, ok := rfs.fs.(billy.Change)
-	if !ok {
-		return &fs.PathError{Op: "chmod", Path: name, Err: fs.ErrInvalid}
-	}
-
+func (rfs *RetryFS) ChmodContext(ctx context.Context, name string, mode os.FileMode) error {
 	return rfs.retryWithContext(ctx, OpChmod, func() error {
-		return changer.Chmod(name, mode)
+		return rfs.fs.Chmod(name, mode)
 	})
 }
 
 // ChtimesContext changes file times with context support
 func (rfs *RetryFS) ChtimesContext(ctx context.Context, name string, atime, mtime time.Time) error {
-	changer, ok := rfs.fs.(billy.Change)
-	if !ok {
-		return &fs.PathError{Op: "chtimes", Path: name, Err: fs.ErrInvalid}
-	}
-
 	return rfs.retryWithContext(ctx, OpChtimes, func() error {
-		return changer.Chtimes(name, atime, mtime)
+		return rfs.fs.Chtimes(name, atime, mtime)
 	})
 }
 
 // LchownContext changes file owner without following symlinks with context support
 func (rfs *RetryFS) LchownContext(ctx context.Context, name string, uid, gid int) error {
-	changer, ok := rfs.fs.(billy.Change)
+	sl, ok := rfs.fs.(absfs.SymLinker)
 	if !ok {
-		return &fs.PathError{Op: "lchown", Path: name, Err: fs.ErrInvalid}
+		return &os.PathError{Op: "lchown", Path: name, Err: absfs.ErrNotImplemented}
 	}
-
 	return rfs.retryWithContext(ctx, OpLchown, func() error {
-		return changer.Lchown(name, uid, gid)
+		return sl.Lchown(name, uid, gid)
 	})
 }
 
 // ChownContext changes file owner with context support
 func (rfs *RetryFS) ChownContext(ctx context.Context, name string, uid, gid int) error {
-	changer, ok := rfs.fs.(billy.Change)
-	if !ok {
-		return &fs.PathError{Op: "chown", Path: name, Err: fs.ErrInvalid}
-	}
-
 	return rfs.retryWithContext(ctx, OpChown, func() error {
-		return changer.Chown(name, uid, gid)
+		return rfs.fs.Chown(name, uid, gid)
 	})
 }

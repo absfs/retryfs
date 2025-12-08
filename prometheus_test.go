@@ -4,14 +4,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	dto "github.com/prometheus/client_model/go"
 )
 
+
+
 func TestPrometheusCollector(t *testing.T) {
-	underlying := memfs.New()
+	underlying := mustNewMemFS()
 	fs := New(underlying).(*RetryFS)
 
 	// Create some test data
@@ -66,7 +67,7 @@ func TestPrometheusCollector(t *testing.T) {
 }
 
 func TestPrometheusCollector_WithCircuitBreaker(t *testing.T) {
-	underlying := memfs.New()
+	underlying := mustNewMemFS()
 	cb := NewCircuitBreaker()
 	fs := New(underlying, WithCircuitBreaker(cb)).(*RetryFS)
 
@@ -114,7 +115,7 @@ func TestPrometheusCollector_WithCircuitBreaker(t *testing.T) {
 }
 
 func TestPrometheusCollector_Namespace(t *testing.T) {
-	underlying := memfs.New()
+	underlying := mustNewMemFS()
 	fs := New(underlying).(*RetryFS)
 
 	// Create collector with custom namespace
@@ -139,7 +140,7 @@ func TestPrometheusCollector_Namespace(t *testing.T) {
 }
 
 func TestPrometheusCollector_PerOperationMetrics(t *testing.T) {
-	underlying := memfs.New()
+	underlying := mustNewMemFS()
 	fs := New(underlying).(*RetryFS)
 
 	// Perform different operations
@@ -149,7 +150,7 @@ func TestPrometheusCollector_PerOperationMetrics(t *testing.T) {
 		f.Close()
 	}
 	_, _ = fs.Stat("/test/file.txt")
-	_, _ = fs.ReadDir("/test")
+	if df, _ := fs.Open("/test"); df != nil { df.Readdir(-1); df.Close() }
 
 	// Create collector
 	collector := NewPrometheusCollector(fs, "test", "")
@@ -175,7 +176,7 @@ func TestPrometheusCollector_PerOperationMetrics(t *testing.T) {
 		}
 	}
 
-	expectedOps := []string{"mkdirall", "create", "stat", "readdir"}
+	expectedOps := []string{"mkdirall", "create", "stat", "open"}
 	for _, op := range expectedOps {
 		if !foundOperations[op] {
 			t.Errorf("Expected to find operation label: %s", op)
@@ -186,7 +187,7 @@ func TestPrometheusCollector_PerOperationMetrics(t *testing.T) {
 }
 
 func TestPrometheusCollector_ErrorClassification(t *testing.T) {
-	underlying := newFailingFS(memfs.New(), 2)
+	underlying := newFailingFS(mustNewMemFS(), 2)
 	fs := New(underlying, WithPolicy(&Policy{
 		MaxAttempts: 5,
 		BaseDelay:   1,
@@ -220,7 +221,7 @@ func TestPrometheusCollector_ErrorClassification(t *testing.T) {
 }
 
 func TestPrometheusCollector_MustRegister(t *testing.T) {
-	underlying := memfs.New()
+	underlying := mustNewMemFS()
 	fs := New(underlying).(*RetryFS)
 
 	// Perform an operation to generate metrics
@@ -242,7 +243,7 @@ func TestPrometheusCollector_MustRegister(t *testing.T) {
 }
 
 func TestPrometheusCollector_CircuitBreakerStates(t *testing.T) {
-	underlying := memfs.New()
+	underlying := mustNewMemFS()
 	cb := NewCircuitBreaker()
 	cb.FailureThreshold = 2
 	fs := New(underlying, WithCircuitBreaker(cb)).(*RetryFS)

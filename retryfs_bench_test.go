@@ -7,12 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-git/go-billy/v5/memfs"
 )
+
+
 
 // BenchmarkOpen_NoRetry benchmarks open operation on unwrapped filesystem
 func BenchmarkOpen_NoRetry(b *testing.B) {
-	fs := memfs.New()
+	fs := mustNewMemFS()
 
 	// Create a test file
 	f, _ := fs.Create("/test.txt")
@@ -30,7 +31,7 @@ func BenchmarkOpen_NoRetry(b *testing.B) {
 
 // BenchmarkOpen_WithRetryWrapper benchmarks open with retry wrapper (no retries needed)
 func BenchmarkOpen_WithRetryWrapper(b *testing.B) {
-	underlying := memfs.New()
+	underlying := mustNewMemFS()
 	fs := New(underlying).(*RetryFS)
 
 	// Create a test file
@@ -51,7 +52,7 @@ func BenchmarkOpen_WithRetryWrapper(b *testing.B) {
 func BenchmarkOpen_WithRetry_1Fail(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		underlying := newFailingFS(memfs.New(), 1) // Fail once
+		underlying := newFailingFS(mustNewMemFS(), 1) // Fail once
 		fs := New(underlying, WithPolicy(&Policy{
 			MaxAttempts: 3,
 			BaseDelay:   1 * time.Millisecond,
@@ -77,7 +78,7 @@ func BenchmarkOpen_WithRetry_1Fail(b *testing.B) {
 func BenchmarkOpen_WithRetry_3Fail(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		underlying := newFailingFS(memfs.New(), 3) // Fail 3 times
+		underlying := newFailingFS(mustNewMemFS(), 3) // Fail 3 times
 		fs := New(underlying, WithPolicy(&Policy{
 			MaxAttempts: 5,
 			BaseDelay:   1 * time.Millisecond,
@@ -101,7 +102,7 @@ func BenchmarkOpen_WithRetry_3Fail(b *testing.B) {
 
 // BenchmarkCalculateBackoff benchmarks backoff calculation
 func BenchmarkCalculateBackoff(b *testing.B) {
-	fs := New(memfs.New()).(*RetryFS)
+	fs := New(mustNewMemFS()).(*RetryFS)
 	policy := DefaultPolicy
 
 	b.ResetTimer()
@@ -143,7 +144,7 @@ func BenchmarkCircuitBreaker_Open(b *testing.B) {
 
 // BenchmarkStat_NoRetry benchmarks stat without retry wrapper
 func BenchmarkStat_NoRetry(b *testing.B) {
-	fs := memfs.New()
+	fs := mustNewMemFS()
 
 	// Create a test file
 	f, _ := fs.Create("/test.txt")
@@ -160,7 +161,7 @@ func BenchmarkStat_NoRetry(b *testing.B) {
 
 // BenchmarkStat_WithRetryWrapper benchmarks stat with retry wrapper
 func BenchmarkStat_WithRetryWrapper(b *testing.B) {
-	underlying := memfs.New()
+	underlying := mustNewMemFS()
 	fs := New(underlying).(*RetryFS)
 
 	// Create a test file
@@ -180,7 +181,7 @@ func BenchmarkStat_WithRetryWrapper(b *testing.B) {
 func BenchmarkMkdirAll_NoRetry(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		fs := memfs.New()
+		fs := mustNewMemFS()
 		b.StartTimer()
 
 		err := fs.MkdirAll("/test/deep/path", 0755)
@@ -194,7 +195,7 @@ func BenchmarkMkdirAll_NoRetry(b *testing.B) {
 func BenchmarkMkdirAll_WithRetryWrapper(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		underlying := memfs.New()
+		underlying := mustNewMemFS()
 		fs := New(underlying).(*RetryFS)
 		b.StartTimer()
 
@@ -207,7 +208,7 @@ func BenchmarkMkdirAll_WithRetryWrapper(b *testing.B) {
 
 // BenchmarkContext_Success benchmarks context-aware operation (success case)
 func BenchmarkContext_Success(b *testing.B) {
-	underlying := memfs.New()
+	underlying := mustNewMemFS()
 	fs := New(underlying).(*RetryFS)
 	ctx := context.Background()
 
@@ -220,7 +221,7 @@ func BenchmarkContext_Success(b *testing.B) {
 
 // BenchmarkContext_WithDeadline benchmarks context-aware operation with deadline
 func BenchmarkContext_WithDeadline(b *testing.B) {
-	underlying := memfs.New()
+	underlying := mustNewMemFS()
 	fs := New(underlying).(*RetryFS)
 
 	b.ResetTimer()
@@ -260,7 +261,7 @@ func BenchmarkMetricsRecording(b *testing.B) {
 
 // BenchmarkParallelOpen benchmarks concurrent open operations
 func BenchmarkParallelOpen(b *testing.B) {
-	underlying := memfs.New()
+	underlying := mustNewMemFS()
 	fs := New(underlying).(*RetryFS)
 
 	// Create a test file
@@ -281,7 +282,7 @@ func BenchmarkParallelOpen(b *testing.B) {
 
 // BenchmarkParallelStat benchmarks concurrent stat operations
 func BenchmarkParallelStat(b *testing.B) {
-	underlying := memfs.New()
+	underlying := mustNewMemFS()
 	fs := New(underlying).(*RetryFS)
 
 	// Create a test file
@@ -304,7 +305,7 @@ func BenchmarkParallelStat(b *testing.B) {
 
 // BenchmarkMemory_Open_NoWrapper measures baseline memory allocations
 func BenchmarkMemory_Open_NoWrapper(b *testing.B) {
-	fs := memfs.New()
+	fs := mustNewMemFS()
 	f, _ := fs.Create("/test.txt")
 	f.Close()
 
@@ -321,7 +322,7 @@ func BenchmarkMemory_Open_NoWrapper(b *testing.B) {
 
 // BenchmarkMemory_Open_WithRetryFS measures RetryFS overhead
 func BenchmarkMemory_Open_WithRetryFS(b *testing.B) {
-	underlying := memfs.New()
+	underlying := mustNewMemFS()
 	fs := New(underlying).(*RetryFS)
 	f, _ := fs.Create("/test.txt")
 	f.Close()
@@ -339,7 +340,7 @@ func BenchmarkMemory_Open_WithRetryFS(b *testing.B) {
 
 // BenchmarkMemory_Open_WithCircuitBreaker measures circuit breaker overhead
 func BenchmarkMemory_Open_WithCircuitBreaker(b *testing.B) {
-	underlying := memfs.New()
+	underlying := mustNewMemFS()
 	cb := NewCircuitBreaker()
 	fs := New(underlying, WithCircuitBreaker(cb)).(*RetryFS)
 	f, _ := fs.Create("/test.txt")
@@ -358,7 +359,7 @@ func BenchmarkMemory_Open_WithCircuitBreaker(b *testing.B) {
 
 // BenchmarkMemory_Open_WithPerOpCircuitBreaker measures per-operation circuit breaker overhead
 func BenchmarkMemory_Open_WithPerOpCircuitBreaker(b *testing.B) {
-	underlying := memfs.New()
+	underlying := mustNewMemFS()
 	pocb := NewPerOperationCircuitBreaker(nil)
 	fs := New(underlying, WithPerOperationCircuitBreaker(pocb)).(*RetryFS)
 	f, _ := fs.Create("/test.txt")
@@ -377,7 +378,7 @@ func BenchmarkMemory_Open_WithPerOpCircuitBreaker(b *testing.B) {
 
 // BenchmarkMemory_Open_WithLogger measures logging overhead
 func BenchmarkMemory_Open_WithLogger(b *testing.B) {
-	underlying := memfs.New()
+	underlying := mustNewMemFS()
 	logger := &NoopLogger{}
 	fs := New(underlying, WithLogger(logger)).(*RetryFS)
 	f, _ := fs.Create("/test.txt")
@@ -397,7 +398,7 @@ func BenchmarkMemory_Open_WithLogger(b *testing.B) {
 // BenchmarkMemory_Stat_Comparison compares Stat allocations
 func BenchmarkMemory_Stat_Comparison(b *testing.B) {
 	b.Run("NoWrapper", func(b *testing.B) {
-		fs := memfs.New()
+		fs := mustNewMemFS()
 		f, _ := fs.Create("/test.txt")
 		f.Close()
 
@@ -412,7 +413,7 @@ func BenchmarkMemory_Stat_Comparison(b *testing.B) {
 	})
 
 	b.Run("WithRetryFS", func(b *testing.B) {
-		underlying := memfs.New()
+		underlying := mustNewMemFS()
 		fs := New(underlying).(*RetryFS)
 		f, _ := fs.Create("/test.txt")
 		f.Close()
@@ -434,7 +435,7 @@ func BenchmarkMemory_MkdirAll_Comparison(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			b.StopTimer()
-			fs := memfs.New()
+			fs := mustNewMemFS()
 			b.StartTimer()
 
 			err := fs.MkdirAll("/test/deep/path", 0755)
@@ -448,7 +449,7 @@ func BenchmarkMemory_MkdirAll_Comparison(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			b.StopTimer()
-			underlying := memfs.New()
+			underlying := mustNewMemFS()
 			fs := New(underlying).(*RetryFS)
 			b.StartTimer()
 
@@ -463,7 +464,7 @@ func BenchmarkMemory_MkdirAll_Comparison(b *testing.B) {
 // BenchmarkMemory_ReadDir measures directory reading allocations
 func BenchmarkMemory_ReadDir(b *testing.B) {
 	b.Run("NoWrapper", func(b *testing.B) {
-		fs := memfs.New()
+		fs := mustNewMemFS()
 		fs.MkdirAll("/test", 0755)
 		for i := 0; i < 10; i++ {
 			f, _ := fs.Create("/test/file" + string(rune('0'+i)) + ".txt")
@@ -473,7 +474,7 @@ func BenchmarkMemory_ReadDir(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			_, err := fs.ReadDir("/test")
+			f, err := fs.Open("/test"); if err == nil { _, err = f.Readdir(-1); f.Close() }
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -481,7 +482,7 @@ func BenchmarkMemory_ReadDir(b *testing.B) {
 	})
 
 	b.Run("WithRetryFS", func(b *testing.B) {
-		underlying := memfs.New()
+		underlying := mustNewMemFS()
 		fs := New(underlying).(*RetryFS)
 		fs.MkdirAll("/test", 0755)
 		for i := 0; i < 10; i++ {
@@ -492,7 +493,7 @@ func BenchmarkMemory_ReadDir(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			_, err := fs.ReadDir("/test")
+			f, err := fs.Open("/test"); if err == nil { _, err = f.Readdir(-1); f.Close() }
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -502,7 +503,7 @@ func BenchmarkMemory_ReadDir(b *testing.B) {
 
 // BenchmarkMemory_ContextOperations measures context-aware operation allocations
 func BenchmarkMemory_ContextOperations(b *testing.B) {
-	underlying := memfs.New()
+	underlying := mustNewMemFS()
 	fs := New(underlying).(*RetryFS)
 	ctx := context.Background()
 
@@ -556,7 +557,7 @@ func BenchmarkMemory_ErrorClassifier(b *testing.B) {
 
 // BenchmarkMemory_FullStack measures full stack with all features enabled
 func BenchmarkMemory_FullStack(b *testing.B) {
-	underlying := memfs.New()
+	underlying := mustNewMemFS()
 	cb := NewCircuitBreaker()
 	logger := &NoopLogger{}
 	fs := New(underlying,

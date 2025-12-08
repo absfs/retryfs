@@ -277,7 +277,7 @@ func TestPerOperationCircuitBreaker_ThreadSafety(t *testing.T) {
 	})
 
 	var wg sync.WaitGroup
-	operations := []Operation{OpOpen, OpCreate, OpStat, OpReadDir, OpMkdirAll}
+	operations := []Operation{OpOpen, OpCreate, OpStat, OpMkdirAll}
 
 	// Spawn multiple goroutines calling different operations
 	for i := 0; i < 10; i++ {

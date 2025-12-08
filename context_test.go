@@ -7,12 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-git/go-billy/v5/memfs"
 )
+
+
 
 func TestContextCancellation(t *testing.T) {
 	mock := &mockFailingFS{
-		Filesystem:   memfs.New(),
+		FileSystem:   mustNewMemFS(),
 		failuresLeft: 100, // Always fail
 	}
 
@@ -52,7 +53,7 @@ func TestContextCancellation(t *testing.T) {
 
 func TestContextDeadline(t *testing.T) {
 	mock := &mockFailingFS{
-		Filesystem:   memfs.New(),
+		FileSystem:   mustNewMemFS(),
 		failuresLeft: 100, // Always fail
 	}
 
@@ -86,7 +87,7 @@ func TestContextDeadline(t *testing.T) {
 }
 
 func TestContextSuccess(t *testing.T) {
-	fs := memfs.New()
+	fs := mustNewMemFS()
 	rfs := New(fs).(*RetryFS)
 
 	ctx := context.Background()
@@ -114,7 +115,7 @@ func TestContextSuccess(t *testing.T) {
 
 func TestContextCanceledDuringBackoff(t *testing.T) {
 	mock := &mockFailingFS{
-		Filesystem:   memfs.New(),
+		FileSystem:   mustNewMemFS(),
 		failuresLeft: 100, // Always fail
 	}
 
@@ -153,7 +154,7 @@ func TestContextCanceledDuringBackoff(t *testing.T) {
 
 func TestContextWithTransientFailures(t *testing.T) {
 	mock := &mockFailingFS{
-		Filesystem:   memfs.New(),
+		FileSystem:   mustNewMemFS(),
 		failuresLeft: 2, // Fail twice then succeed
 	}
 
@@ -178,7 +179,7 @@ func TestContextWithTransientFailures(t *testing.T) {
 }
 
 func TestAllContextMethods(t *testing.T) {
-	fs := memfs.New()
+	fs := mustNewMemFS()
 	rfs := New(fs).(*RetryFS)
 
 	ctx := context.Background()
@@ -221,10 +222,15 @@ func TestAllContextMethods(t *testing.T) {
 		t.Fatalf("LstatContext failed: %v", err)
 	}
 
-	// ReadDir
-	_, err = rfs.ReadDirContext(ctx, "/test")
+	// Open directory (ReadDir not part of absfs interface)
+	dirFile, err := rfs.OpenContext(ctx, "/test")
 	if err != nil {
-		t.Fatalf("ReadDirContext failed: %v", err)
+		t.Fatalf("OpenContext for directory failed: %v", err)
+	}
+	_, err = dirFile.Readdir(-1)
+	dirFile.Close()
+	if err != nil {
+		t.Fatalf("Readdir failed: %v", err)
 	}
 
 	// Rename
@@ -237,17 +243,17 @@ func TestAllContextMethods(t *testing.T) {
 		t.Fatalf("RemoveContext failed: %v", err)
 	}
 
-	// TempFile
-	tmpFile, err := rfs.TempFileContext(ctx, "/test", "tmp")
+	// Create a temp file manually (TempFile not part of absfs interface)
+	tmpFile, err := rfs.CreateContext(ctx, "/test/tmpfile.txt")
 	if err != nil {
-		t.Fatalf("TempFileContext failed: %v", err)
+		t.Fatalf("CreateContext for temp file failed: %v", err)
 	}
 	tmpFile.Close()
 }
 
 func TestContextWithCircuitBreaker(t *testing.T) {
 	mock := &mockFailingFS{
-		Filesystem:   memfs.New(),
+		FileSystem:   mustNewMemFS(),
 		failuresLeft: 100, // Always fail
 	}
 
@@ -285,7 +291,7 @@ func TestContextWithCircuitBreaker(t *testing.T) {
 }
 
 func TestContextCanceledBeforeFirstAttempt(t *testing.T) {
-	fs := memfs.New()
+	fs := mustNewMemFS()
 	rfs := New(fs).(*RetryFS)
 
 	// Create already-canceled context
@@ -300,7 +306,7 @@ func TestContextCanceledBeforeFirstAttempt(t *testing.T) {
 
 func TestContextWithRetryableErrors(t *testing.T) {
 	mock := &mockCustomErrorFS{
-		Filesystem:    memfs.New(),
+		FileSystem:    mustNewMemFS(),
 		errorToReturn: syscall.ETIMEDOUT,
 		failuresLeft:  3,
 	}
@@ -326,7 +332,7 @@ func TestContextWithRetryableErrors(t *testing.T) {
 }
 
 func TestContextPropagationToChmod(t *testing.T) {
-	fs := memfs.New()
+	fs := mustNewMemFS()
 	rfs := New(fs).(*RetryFS)
 
 	ctx := context.Background()
@@ -358,7 +364,7 @@ func TestContextPropagationToChmod(t *testing.T) {
 
 func TestContextMetricsRecording(t *testing.T) {
 	mock := &mockFailingFS{
-		Filesystem:   memfs.New(),
+		FileSystem:   mustNewMemFS(),
 		failuresLeft: 2,
 	}
 

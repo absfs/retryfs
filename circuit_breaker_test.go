@@ -6,8 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-git/go-billy/v5/memfs"
 )
+
+
 
 func TestNewCircuitBreaker(t *testing.T) {
 	cb := NewCircuitBreaker()
@@ -352,7 +353,7 @@ func TestStateString(t *testing.T) {
 
 func TestCircuitBreakerWithRetryFS(t *testing.T) {
 	mock := &mockFailingFS{
-		Filesystem:   memfs.New(),
+		FileSystem:   mustNewMemFS(),
 		failuresLeft: 100, // Always fail
 	}
 

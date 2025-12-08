@@ -3,24 +3,24 @@ package retryfs
 import (
 	"errors"
 	"fmt"
-	"io/fs"
 	"math"
+	"os"
 	"syscall"
 	"testing"
 	"time"
 
-	"github.com/go-git/go-billy/v5"
-	"github.com/go-git/go-billy/v5/memfs"
+	"github.com/absfs/absfs"
 )
+
 
 // failingFS wraps a filesystem to simulate failures for testing
 type failingFS struct {
-	fs           billy.Filesystem
+	fs           absfs.FileSystem
 	failuresLeft int
 	failError    error
 }
 
-func newFailingFS(fs billy.Filesystem, failures int) *failingFS {
+func newFailingFS(fs absfs.FileSystem, failures int) *failingFS {
 	return &failingFS{
 		fs:           fs,
 		failuresLeft: failures,
@@ -36,28 +36,28 @@ func (f *failingFS) shouldFail() bool {
 	return false
 }
 
-func (f *failingFS) Create(filename string) (billy.File, error) {
+func (f *failingFS) Create(filename string) (absfs.File, error) {
 	if f.shouldFail() {
 		return nil, f.failError
 	}
 	return f.fs.Create(filename)
 }
 
-func (f *failingFS) Open(filename string) (billy.File, error) {
+func (f *failingFS) Open(filename string) (absfs.File, error) {
 	if f.shouldFail() {
 		return nil, f.failError
 	}
 	return f.fs.Open(filename)
 }
 
-func (f *failingFS) OpenFile(filename string, flag int, perm fs.FileMode) (billy.File, error) {
+func (f *failingFS) OpenFile(filename string, flag int, perm os.FileMode) (absfs.File, error) {
 	if f.shouldFail() {
 		return nil, f.failError
 	}
 	return f.fs.OpenFile(filename, flag, perm)
 }
 
-func (f *failingFS) Stat(filename string) (fs.FileInfo, error) {
+func (f *failingFS) Stat(filename string) (os.FileInfo, error) {
 	if f.shouldFail() {
 		return nil, f.failError
 	}
@@ -78,61 +78,120 @@ func (f *failingFS) Remove(filename string) error {
 	return f.fs.Remove(filename)
 }
 
-func (f *failingFS) Join(elem ...string) string {
-	return f.fs.Join(elem...)
-}
-
-func (f *failingFS) TempFile(dir, prefix string) (billy.File, error) {
+func (f *failingFS) Mkdir(name string, perm os.FileMode) error {
 	if f.shouldFail() {
-		return nil, f.failError
+		return f.failError
 	}
-	return f.fs.TempFile(dir, prefix)
+	return f.fs.Mkdir(name, perm)
 }
 
-func (f *failingFS) ReadDir(path string) ([]fs.FileInfo, error) {
-	if f.shouldFail() {
-		return nil, f.failError
-	}
-	return f.fs.ReadDir(path)
-}
-
-func (f *failingFS) MkdirAll(filename string, perm fs.FileMode) error {
+func (f *failingFS) MkdirAll(filename string, perm os.FileMode) error {
 	if f.shouldFail() {
 		return f.failError
 	}
 	return f.fs.MkdirAll(filename, perm)
 }
 
-func (f *failingFS) Lstat(filename string) (fs.FileInfo, error) {
-	if f.shouldFail() {
-		return nil, f.failError
-	}
-	return f.fs.Lstat(filename)
-}
-
-func (f *failingFS) Symlink(target, link string) error {
+func (f *failingFS) RemoveAll(path string) error {
 	if f.shouldFail() {
 		return f.failError
 	}
-	return f.fs.Symlink(target, link)
+	return f.fs.RemoveAll(path)
 }
 
-func (f *failingFS) Readlink(link string) (string, error) {
+func (f *failingFS) Chmod(name string, mode os.FileMode) error {
+	if f.shouldFail() {
+		return f.failError
+	}
+	return f.fs.Chmod(name, mode)
+}
+
+func (f *failingFS) Chtimes(name string, atime time.Time, mtime time.Time) error {
+	if f.shouldFail() {
+		return f.failError
+	}
+	return f.fs.Chtimes(name, atime, mtime)
+}
+
+func (f *failingFS) Chown(name string, uid, gid int) error {
+	if f.shouldFail() {
+		return f.failError
+	}
+	return f.fs.Chown(name, uid, gid)
+}
+
+func (f *failingFS) Separator() uint8 {
+	return f.fs.Separator()
+}
+
+func (f *failingFS) ListSeparator() uint8 {
+	return f.fs.ListSeparator()
+}
+
+func (f *failingFS) Chdir(dir string) error {
+	if f.shouldFail() {
+		return f.failError
+	}
+	return f.fs.Chdir(dir)
+}
+
+func (f *failingFS) Getwd() (string, error) {
 	if f.shouldFail() {
 		return "", f.failError
 	}
-	return f.fs.Readlink(link)
+	return f.fs.Getwd()
 }
 
-func (f *failingFS) Chroot(path string) (billy.Filesystem, error) {
+func (f *failingFS) TempDir() string {
+	return f.fs.TempDir()
+}
+
+func (f *failingFS) Truncate(name string, size int64) error {
 	if f.shouldFail() {
-		return nil, f.failError
+		return f.failError
 	}
-	return f.fs.Chroot(path)
+	return f.fs.Truncate(name, size)
 }
 
-func (f *failingFS) Root() string {
-	return f.fs.Root()
+// Symlink operations
+func (f *failingFS) Lstat(filename string) (os.FileInfo, error) {
+	if sl, ok := f.fs.(absfs.SymLinker); ok {
+		if f.shouldFail() {
+			return nil, f.failError
+		}
+		return sl.Lstat(filename)
+	}
+	return f.Stat(filename)
+}
+
+func (f *failingFS) Lchown(name string, uid, gid int) error {
+	if sl, ok := f.fs.(absfs.SymLinker); ok {
+		if f.shouldFail() {
+			return f.failError
+		}
+		return sl.Lchown(name, uid, gid)
+	}
+	return absfs.ErrNotImplemented
+}
+
+func (f *failingFS) Symlink(oldname, newname string) error {
+	if sl, ok := f.fs.(absfs.SymLinker); ok {
+		if f.shouldFail() {
+			return f.failError
+		}
+		return sl.Symlink(oldname, newname)
+	}
+	return absfs.ErrNotImplemented
+}
+
+func (f *failingFS) Readlink(name string) (string, error) {
+	if sl, ok := f.fs.(absfs.SymLinker); ok {
+		if f.shouldFail() {
+			return "", f.failError
+		}
+		return sl.Readlink(name)
+	}
+	return "", absfs.ErrNotImplemented
 }
 
 func TestCalculateBackoff(t *testing.T) {
@@ -143,7 +202,8 @@ func TestCalculateBackoff(t *testing.T) {
 		Multiplier: 2.0,
 	}
 
-	rfs := New(memfs.New()).(*RetryFS)
+	mfs := mustNewMemFS()
+	rfs := New(mfs).(*RetryFS)
 
 	tests := []struct {
 		attempt  int
@@ -179,7 +239,7 @@ func TestCalculateBackoffWithJitter(t *testing.T) {
 		Multiplier: 2.0,
 	}
 
-	rfs := New(memfs.New()).(*RetryFS)
+	rfs := New(mustNewMemFS()).(*RetryFS)
 
 	// Test that jitter produces values within expected range
 	attempt := 3
@@ -205,7 +265,7 @@ func TestShouldRetry(t *testing.T) {
 		Multiplier:  2.0,
 	}
 
-	rfs := New(memfs.New(), WithPolicy(policy)).(*RetryFS)
+	rfs := New(mustNewMemFS(), WithPolicy(policy)).(*RetryFS)
 
 	tests := []struct {
 		name     string
@@ -218,8 +278,8 @@ func TestShouldRetry(t *testing.T) {
 		{"retryable error, attempt 1", syscall.ETIMEDOUT, 1, true},
 		{"retryable error, attempt 2", syscall.ETIMEDOUT, 2, true},
 		{"retryable error, max attempts", syscall.ETIMEDOUT, 3, false},
-		{"permanent error", fs.ErrNotExist, 0, false},
-		{"permanent error, attempt 1", fs.ErrNotExist, 1, false},
+		{"permanent error", os.ErrNotExist, 0, false},
+		{"permanent error, attempt 1", os.ErrNotExist, 1, false},
 		{"unknown error, attempt 0", errors.New("unknown"), 0, true},
 		{"unknown error, max attempts", errors.New("unknown"), 3, false},
 	}
@@ -236,7 +296,7 @@ func TestShouldRetry(t *testing.T) {
 }
 
 func TestRetrySuccessOnFirstAttempt(t *testing.T) {
-	fs := memfs.New()
+	fs := mustNewMemFS()
 	rfs := New(fs).(*RetryFS)
 
 	// Create a file successfully
@@ -260,7 +320,7 @@ func TestRetrySuccessOnFirstAttempt(t *testing.T) {
 
 func TestRetryWithTransientFailure(t *testing.T) {
 	mock := &mockFailingFS{
-		Filesystem:   memfs.New(),
+		FileSystem:   mustNewMemFS(),
 		failuresLeft: 2, // Fail twice, then succeed
 	}
 
@@ -295,7 +355,7 @@ func TestRetryWithTransientFailure(t *testing.T) {
 
 func TestRetryExhaustion(t *testing.T) {
 	mock := &mockFailingFS{
-		Filesystem:   memfs.New(),
+		FileSystem:   mustNewMemFS(),
 		failuresLeft: 100, // Always fail
 	}
 
@@ -326,7 +386,7 @@ func TestRetryExhaustion(t *testing.T) {
 }
 
 func TestRetryPermanentError(t *testing.T) {
-	fs := memfs.New()
+	fs := mustNewMemFS()
 	rfs := New(fs).(*RetryFS)
 
 	// Try to stat a non-existent file (permanent error)
@@ -347,7 +407,7 @@ func TestRetryPermanentError(t *testing.T) {
 
 func TestOnRetryCallback(t *testing.T) {
 	mock := &mockFailingFS{
-		Filesystem:   memfs.New(),
+		FileSystem:   mustNewMemFS(),
 		failuresLeft: 2,
 	}
 
@@ -423,7 +483,7 @@ func TestCustomErrorClassifier(t *testing.T) {
 	}
 
 	mock := &mockCustomErrorFS{
-		Filesystem: memfs.New(),
+		FileSystem: mustNewMemFS(),
 		errorToReturn: customErr,
 		failuresLeft:  2,
 	}
@@ -468,7 +528,7 @@ func TestBackoffMultiplier(t *testing.T) {
 				Multiplier: tt.multiplier,
 			}
 
-			rfs := New(memfs.New()).(*RetryFS)
+			rfs := New(mustNewMemFS()).(*RetryFS)
 			delay := rfs.calculateBackoff(policy, tt.attempt)
 			expected := time.Duration(tt.expected) * time.Millisecond
 
@@ -484,29 +544,29 @@ func TestBackoffMultiplier(t *testing.T) {
 
 // mockFailingFS simulates a filesystem that fails a certain number of times
 type mockFailingFS struct {
-	billy.Filesystem
+	absfs.FileSystem
 	failuresLeft int
 }
 
-func (m *mockFailingFS) MkdirAll(path string, perm fs.FileMode) error {
+func (m *mockFailingFS) MkdirAll(path string, perm os.FileMode) error {
 	if m.failuresLeft > 0 {
 		m.failuresLeft--
 		return syscall.ETIMEDOUT // Retryable error
 	}
-	return m.Filesystem.MkdirAll(path, perm)
+	return m.FileSystem.MkdirAll(path, perm)
 }
 
 // mockCustomErrorFS returns a custom error
 type mockCustomErrorFS struct {
-	billy.Filesystem
+	absfs.FileSystem
 	errorToReturn error
 	failuresLeft  int
 }
 
-func (m *mockCustomErrorFS) MkdirAll(path string, perm fs.FileMode) error {
+func (m *mockCustomErrorFS) MkdirAll(path string, perm os.FileMode) error {
 	if m.failuresLeft > 0 {
 		m.failuresLeft--
 		return m.errorToReturn
 	}
-	return m.Filesystem.MkdirAll(path, perm)
+	return m.FileSystem.MkdirAll(path, perm)
 }

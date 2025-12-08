@@ -4,20 +4,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
 	"math/rand"
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/go-git/go-billy/v5"
-	"github.com/go-git/go-billy/v5/memfs"
+	"github.com/absfs/absfs"
 )
+
+
 
 // chaosFS injects random failures for chaos testing
 type chaosFS struct {
-	fs               billy.Filesystem
+	fs               absfs.FileSystem
 	failureProbability float64
 	mu               sync.Mutex // Protects both RNG and underlying FS (memfs is not thread-safe)
 	rng              *rand.Rand
@@ -25,7 +26,7 @@ type chaosFS struct {
 	failures         int64
 }
 
-func newChaosFS(fs billy.Filesystem, failureProbability float64) *chaosFS {
+func newChaosFS(fs absfs.FileSystem, failureProbability float64) *chaosFS {
 	return &chaosFS{
 		fs:               fs,
 		failureProbability: failureProbability,
@@ -49,7 +50,7 @@ func (c *chaosFS) getStats() (calls, failures int64) {
 	return atomic.LoadInt64(&c.totalCalls), atomic.LoadInt64(&c.failures)
 }
 
-func (c *chaosFS) Create(filename string) (billy.File, error) {
+func (c *chaosFS) Create(filename string) (absfs.File, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -61,21 +62,21 @@ func (c *chaosFS) Create(filename string) (billy.File, error) {
 	return c.fs.Create(filename)
 }
 
-func (c *chaosFS) Open(filename string) (billy.File, error) {
+func (c *chaosFS) Open(filename string) (absfs.File, error) {
 	if c.shouldFail() {
 		return nil, errors.New("chaos: connection timeout")
 	}
 	return c.fs.Open(filename)
 }
 
-func (c *chaosFS) OpenFile(filename string, flag int, perm fs.FileMode) (billy.File, error) {
+func (c *chaosFS) OpenFile(filename string, flag int, perm os.FileMode) (absfs.File, error) {
 	if c.shouldFail() {
 		return nil, errors.New("chaos: temporary failure")
 	}
 	return c.fs.OpenFile(filename, flag, perm)
 }
 
-func (c *chaosFS) Stat(filename string) (fs.FileInfo, error) {
+func (c *chaosFS) Stat(filename string) (os.FileInfo, error) {
 	if c.shouldFail() {
 		return nil, errors.New("chaos: service unavailable")
 	}
@@ -96,66 +97,141 @@ func (c *chaosFS) Remove(filename string) error {
 	return c.fs.Remove(filename)
 }
 
-func (c *chaosFS) Join(elem ...string) string {
-	return c.fs.Join(elem...)
-}
 
-func (c *chaosFS) TempFile(dir, prefix string) (billy.File, error) {
-	if c.shouldFail() {
-		return nil, errors.New("chaos: connection refused")
-	}
-	return c.fs.TempFile(dir, prefix)
-}
-
-func (c *chaosFS) ReadDir(path string) ([]fs.FileInfo, error) {
-	if c.shouldFail() {
-		return nil, errors.New("chaos: timeout")
-	}
-	return c.fs.ReadDir(path)
-}
-
-func (c *chaosFS) MkdirAll(filename string, perm fs.FileMode) error {
+func (c *chaosFS) MkdirAll(filename string, perm os.FileMode) error {
 	if c.shouldFail() {
 		return errors.New("chaos: transient error")
 	}
 	return c.fs.MkdirAll(filename, perm)
 }
 
-func (c *chaosFS) Lstat(filename string) (fs.FileInfo, error) {
+func (c *chaosFS) Lstat(filename string) (os.FileInfo, error) {
+	sl, ok := c.fs.(absfs.SymLinker)
+	if !ok {
+		return c.Stat(filename)
+	}
 	if c.shouldFail() {
 		return nil, errors.New("chaos: network timeout")
 	}
-	return c.fs.Lstat(filename)
+	return sl.Lstat(filename)
+}
+
+func (c *chaosFS) Lchown(name string, uid, gid int) error {
+	sl, ok := c.fs.(absfs.SymLinker)
+	if !ok {
+		return absfs.ErrNotImplemented
+	}
+	if c.shouldFail() {
+		return errors.New("chaos: lchown failed")
+	}
+	return sl.Lchown(name, uid, gid)
 }
 
 func (c *chaosFS) Symlink(target, link string) error {
+	sl, ok := c.fs.(absfs.SymLinker)
+	if !ok {
+		return absfs.ErrNotImplemented
+	}
 	if c.shouldFail() {
 		return errors.New("chaos: temporary unavailable")
 	}
-	return c.fs.Symlink(target, link)
+	return sl.Symlink(target, link)
 }
 
 func (c *chaosFS) Readlink(link string) (string, error) {
+	sl, ok := c.fs.(absfs.SymLinker)
+	if !ok {
+		return "", absfs.ErrNotImplemented
+	}
 	if c.shouldFail() {
 		return "", errors.New("chaos: i/o error")
 	}
-	return c.fs.Readlink(link)
+	return sl.Readlink(link)
 }
 
-func (c *chaosFS) Chroot(path string) (billy.Filesystem, error) {
+
+// Mkdir implements absfs.FileSystem
+func (c *chaosFS) Mkdir(name string, perm os.FileMode) error {
 	if c.shouldFail() {
-		return nil, errors.New("chaos: connection error")
+		return errors.New("chaos: mkdir failed")
 	}
-	return c.fs.Chroot(path)
+	return c.fs.Mkdir(name, perm)
 }
 
-func (c *chaosFS) Root() string {
-	return c.fs.Root()
+// RemoveAll implements absfs.FileSystem
+func (c *chaosFS) RemoveAll(path string) error {
+	if c.shouldFail() {
+		return errors.New("chaos: removeall failed")
+	}
+	return c.fs.RemoveAll(path)
+}
+
+// Chmod implements absfs.FileSystem
+func (c *chaosFS) Chmod(name string, mode os.FileMode) error {
+	if c.shouldFail() {
+		return errors.New("chaos: chmod failed")
+	}
+	return c.fs.Chmod(name, mode)
+}
+
+// Chtimes implements absfs.FileSystem
+func (c *chaosFS) Chtimes(name string, atime time.Time, mtime time.Time) error {
+	if c.shouldFail() {
+		return errors.New("chaos: chtimes failed")
+	}
+	return c.fs.Chtimes(name, atime, mtime)
+}
+
+// Chown implements absfs.FileSystem
+func (c *chaosFS) Chown(name string, uid, gid int) error {
+	if c.shouldFail() {
+		return errors.New("chaos: chown failed")
+	}
+	return c.fs.Chown(name, uid, gid)
+}
+
+// Separator implements absfs.FileSystem
+func (c *chaosFS) Separator() uint8 {
+	return c.fs.Separator()
+}
+
+// ListSeparator implements absfs.FileSystem
+func (c *chaosFS) ListSeparator() uint8 {
+	return c.fs.ListSeparator()
+}
+
+// Chdir implements absfs.FileSystem
+func (c *chaosFS) Chdir(dir string) error {
+	if c.shouldFail() {
+		return errors.New("chaos: chdir failed")
+	}
+	return c.fs.Chdir(dir)
+}
+
+// Getwd implements absfs.FileSystem
+func (c *chaosFS) Getwd() (string, error) {
+	if c.shouldFail() {
+		return "", errors.New("chaos: getwd failed")
+	}
+	return c.fs.Getwd()
+}
+
+// TempDir implements absfs.FileSystem
+func (c *chaosFS) TempDir() string {
+	return c.fs.TempDir()
+}
+
+// Truncate implements absfs.FileSystem
+func (c *chaosFS) Truncate(name string, size int64) error {
+	if c.shouldFail() {
+		return errors.New("chaos: truncate failed")
+	}
+	return c.fs.Truncate(name, size)
 }
 
 // TestIntegration_ChaosMonkey tests retryfs with random failures
 func TestIntegration_ChaosMonkey(t *testing.T) {
-	chaos := newChaosFS(memfs.New(), 0.3) // 30% failure rate
+	chaos := newChaosFS(mustNewMemFS(), 0.3) // 30% failure rate
 
 	policy := &Policy{
 		MaxAttempts: 10,
@@ -186,8 +262,13 @@ func TestIntegration_ChaosMonkey(t *testing.T) {
 			_, err := fs.Stat("/test/data/file.txt")
 			return err
 		}},
-		{"Read directory", func() error {
-			_, err := fs.ReadDir("/test/data")
+		{"Open directory", func() error {
+			f, err := fs.Open("/test/data")
+			if err != nil {
+				return err
+			}
+			_, err = f.Readdir(-1)
+			f.Close()
 			return err
 		}},
 	}
@@ -218,7 +299,7 @@ func TestIntegration_ChaosMonkey(t *testing.T) {
 
 // TestIntegration_HighFailureRate tests with very high failure rate
 func TestIntegration_HighFailureRate(t *testing.T) {
-	chaos := newChaosFS(memfs.New(), 0.8) // 80% failure rate!
+	chaos := newChaosFS(mustNewMemFS(), 0.8) // 80% failure rate!
 
 	policy := &Policy{
 		MaxAttempts: 20, // Need many attempts for 80% failure
@@ -252,7 +333,7 @@ func TestIntegration_HighFailureRate(t *testing.T) {
 // Skipped because memfs is not thread-safe
 func TestIntegration_ConcurrentOperations(t *testing.T) {
 	t.Skip("Skipping concurrent test - underlying memfs is not thread-safe")
-	chaos := newChaosFS(memfs.New(), 0.2) // 20% failure rate
+	chaos := newChaosFS(mustNewMemFS(), 0.2) // 20% failure rate
 
 	fs := New(chaos, WithPolicy(&Policy{
 		MaxAttempts: 5,
@@ -314,7 +395,7 @@ func TestIntegration_ConcurrentOperations(t *testing.T) {
 // TestIntegration_ContextCancellation tests context cancellation during retries
 func TestIntegration_ContextCancellation(t *testing.T) {
 	// Create a filesystem that always fails
-	chaos := newChaosFS(memfs.New(), 1.0) // 100% failure rate
+	chaos := newChaosFS(mustNewMemFS(), 1.0) // 100% failure rate
 
 	fs := New(chaos, WithPolicy(&Policy{
 		MaxAttempts: 100, // Many attempts
@@ -351,7 +432,7 @@ func TestIntegration_ContextCancellation(t *testing.T) {
 // TestIntegration_CircuitBreakerTrip tests circuit breaker opening under load
 func TestIntegration_CircuitBreakerTrip(t *testing.T) {
 	// Filesystem that always fails
-	chaos := newChaosFS(memfs.New(), 1.0) // 100% failure rate
+	chaos := newChaosFS(mustNewMemFS(), 1.0) // 100% failure rate
 
 	cb := NewCircuitBreaker()
 	cb.FailureThreshold = 5

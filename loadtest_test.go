@@ -8,8 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-git/go-billy/v5/memfs"
 )
+
+
 
 // TestLoadTest_SequentialOperations tests sustained sequential load
 func TestLoadTest_SequentialOperations(t *testing.T) {
@@ -17,7 +18,7 @@ func TestLoadTest_SequentialOperations(t *testing.T) {
 		t.Skip("Skipping load test in short mode")
 	}
 
-	underlying := memfs.New()
+	underlying := mustNewMemFS()
 	fs := New(underlying, WithPolicy(&Policy{
 		MaxAttempts: 5,
 		BaseDelay:   1 * time.Millisecond,
@@ -50,7 +51,7 @@ func TestLoadTest_SequentialOperations(t *testing.T) {
 				atomic.AddInt64(&successOps, 1)
 			}
 		case 3:
-			_, err := fs.ReadDir("/")
+			f, err := fs.Open("/"); if err == nil { _, err = f.Readdir(-1); f.Close() }
 			if err == nil {
 				atomic.AddInt64(&successOps, 1)
 			}
@@ -79,7 +80,7 @@ func TestLoadTest_WithRetries(t *testing.T) {
 	}
 
 	const numOps = 1000
-	underlying := newFailingFS(memfs.New(), numOps/5) // 20% failure rate
+	underlying := newFailingFS(mustNewMemFS(), numOps/5) // 20% failure rate
 
 	var retries int64
 	fs := New(underlying,
@@ -131,7 +132,7 @@ func TestLoadTest_CircuitBreakerUnderLoad(t *testing.T) {
 	}
 
 	const numOps = 500
-	underlying := newFailingFS(memfs.New(), numOps) // Always fail
+	underlying := newFailingFS(mustNewMemFS(), numOps) // Always fail
 
 	var cbStateChanges int64
 	cb := NewCircuitBreaker()
@@ -182,7 +183,7 @@ func TestLoadTest_PerOperationCircuitBreaker(t *testing.T) {
 	}
 
 	const numOps = 500
-	underlying := newFailingFS(memfs.New(), numOps) // Always fail
+	underlying := newFailingFS(mustNewMemFS(), numOps) // Always fail
 
 	var stateChanges int64
 	pocb := NewPerOperationCircuitBreaker(&CircuitBreakerConfig{
@@ -231,7 +232,7 @@ func TestLoadTest_ContextTimeout(t *testing.T) {
 		t.Skip("Skipping load test in short mode")
 	}
 
-	underlying := memfs.New()
+	underlying := mustNewMemFS()
 	fs := New(underlying).(*RetryFS)
 
 	var cancelledOps int64
@@ -268,7 +269,7 @@ func TestLoadTest_MetricsAccuracy(t *testing.T) {
 	}
 
 	const numOps = 1000
-	underlying := newFailingFS(memfs.New(), numOps/10) // 10% failure rate
+	underlying := newFailingFS(mustNewMemFS(), numOps/10) // 10% failure rate
 
 	fs := New(underlying, WithPolicy(&Policy{
 		MaxAttempts: 5,
@@ -307,7 +308,7 @@ func TestLoadTest_MetricsAccuracy(t *testing.T) {
 
 // BenchmarkLoadTest_Throughput benchmarks maximum throughput
 func BenchmarkLoadTest_Throughput(b *testing.B) {
-	underlying := memfs.New()
+	underlying := mustNewMemFS()
 	fs := New(underlying).(*RetryFS)
 
 	// Prepare test files
@@ -327,7 +328,7 @@ func BenchmarkLoadTest_Throughput(b *testing.B) {
 
 // BenchmarkLoadTest_ThroughputWithRetries benchmarks throughput with retries
 func BenchmarkLoadTest_ThroughputWithRetries(b *testing.B) {
-	underlying := memfs.New()
+	underlying := mustNewMemFS()
 	failingFS := newFailingFS(underlying, b.N/10) // 10% failure rate
 	fs := New(failingFS, WithPolicy(&Policy{
 		MaxAttempts: 3,
@@ -358,7 +359,7 @@ func TestLoadTest_SustainedLoad(t *testing.T) {
 		t.Skip("Skipping load test in short mode")
 	}
 
-	underlying := memfs.New()
+	underlying := mustNewMemFS()
 	fs := New(underlying, WithPolicy(&Policy{
 		MaxAttempts: 3,
 		BaseDelay:   1 * time.Millisecond,
@@ -417,7 +418,7 @@ func TestLoadTest_ConcurrentWorkers(t *testing.T) {
 			defer wg.Done()
 
 			// Each worker gets its own filesystem (avoiding memfs thread-safety issues)
-			underlying := memfs.New()
+			underlying := mustNewMemFS()
 			fs := New(underlying, WithPolicy(&Policy{
 				MaxAttempts: 3,
 				BaseDelay:   1 * time.Millisecond,
