@@ -1,6 +1,6 @@
 module github.com/absfs/retryfs
 
-go 1.23.4
+go 1.21
 
 require (
 	github.com/absfs/absfs v0.0.0-20251208163131-5313f0098c48
