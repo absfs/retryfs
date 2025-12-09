@@ -76,7 +76,7 @@ func TestRetryFS_S3Integration(t *testing.T) {
         Region: aws.String("us-east-1"),
     }))
 
-    s3fs := s3billy.New(sess, "test-bucket")
+    s3fs := s3fs.New(sess, "test-bucket")
 
     // Wrap with RetryFS
     fs := retryfs.New(s3fs,
@@ -150,7 +150,7 @@ func TestRetryFS_WebDAVIntegration(t *testing.T) {
     }
 
     client := webdav.NewClient(webdavURL, http.DefaultClient)
-    webdavFS := webdavbilly.New(client)
+    webdavFS := webdavfs.New(client)
 
     // Configure for network operations
     fs := retryfs.New(webdavFS,
@@ -211,7 +211,7 @@ func TestRetryFS_WebDAVIntegration(t *testing.T) {
 
 ```go
 type FailureInjector struct {
-    underlying billy.Filesystem
+    underlying absfs.FileSystem
     mu         sync.Mutex
 
     // Failure configuration
@@ -224,7 +224,7 @@ type FailureInjector struct {
     injectedFailures int
 }
 
-func NewFailureInjector(fs billy.Filesystem, config FailureConfig) *FailureInjector {
+func NewFailureInjector(fs absfs.FileSystem, config FailureConfig) *FailureInjector {
     return &FailureInjector{
         underlying:     fs,
         failureRate:    config.Rate,
@@ -257,7 +257,7 @@ func (fi *FailureInjector) shouldFail() bool {
     }
 }
 
-func (fi *FailureInjector) Open(filename string) (billy.File, error) {
+func (fi *FailureInjector) Open(filename string) (absfs.File, error) {
     if fi.shouldFail() {
         fi.mu.Lock()
         fi.injectedFailures++
@@ -302,7 +302,7 @@ func TestWithFailureInjection(t *testing.T) {
 
 ```go
 type LatencySimulator struct {
-    underlying billy.Filesystem
+    underlying absfs.FileSystem
     minLatency time.Duration
     maxLatency time.Duration
 }
@@ -547,7 +547,7 @@ type LoadTestResult struct {
     OpsPerSecond   float64
 }
 
-func RunLoadTest(fs billy.Filesystem, config LoadTestConfig) *LoadTestResult {
+func RunLoadTest(fs absfs.FileSystem, config LoadTestConfig) *LoadTestResult {
     var totalOps, successOps, failedOps int64
     start := time.Now()
 
@@ -588,7 +588,7 @@ func RunLoadTest(fs billy.Filesystem, config LoadTestConfig) *LoadTestResult {
 ### Pattern 1: Test Setup with Custom Error Classifier
 
 ```go
-func setupTestFS(t *testing.T, underlying billy.Filesystem) *retryfs.RetryFS {
+func setupTestFS(t *testing.T, underlying absfs.FileSystem) *retryfs.RetryFS {
     t.Helper()
 
     return retryfs.New(underlying,
@@ -644,7 +644,7 @@ func validateMetrics(t *testing.T, fs *retryfs.RetryFS, expectedOps int64) {
 ### Pattern 3: Cleanup Helper
 
 ```go
-func withTempFilesystem(t *testing.T, fn func(fs billy.Filesystem)) {
+func withTempFilesystem(t *testing.T, fn func(fs absfs.FileSystem)) {
     t.Helper()
 
     tmpDir, err := os.MkdirTemp("", "test-*")
@@ -661,7 +661,7 @@ func withTempFilesystem(t *testing.T, fn func(fs billy.Filesystem)) {
 
 // Usage
 func TestSomething(t *testing.T) {
-    withTempFilesystem(t, func(fs billy.Filesystem) {
+    withTempFilesystem(t, func(fs absfs.FileSystem) {
         // Test code here
     })
 }
@@ -761,7 +761,7 @@ import (
     "time"
 
     "github.com/absfs/retryfs"
-    "github.com/go-git/go-billy/v5/memfs"
+    "github.com/absfs/memfs"
 )
 
 func TestIntegration_FullWorkflow(t *testing.T) {

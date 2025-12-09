@@ -5,7 +5,7 @@
 
 ## Project Overview
 
-RetryFS is a production-ready filesystem wrapper that provides automatic retry logic with exponential backoff for unreliable or network-based filesystems. It implements the `billy.Filesystem` interface and transparently handles transient failures.
+RetryFS is a production-ready filesystem wrapper that provides automatic retry logic with exponential backoff for unreliable or network-based filesystems. It implements the `absfs.FileSystem` interface and transparently handles transient failures.
 
 ## Implementation Status
 
@@ -18,7 +18,7 @@ RetryFS is a production-ready filesystem wrapper that provides automatic retry l
 - ✅ Error classification (retryable, permanent, unknown)
 - ✅ Metrics tracking (attempts, retries, successes, failures)
 - ✅ Idempotency considerations
-- ✅ All billy.Filesystem methods implemented
+- ✅ All absfs.FileSystem methods implemented
 
 **Files:**
 - `retryfs.go` (382 lines) - Core implementation
@@ -211,7 +211,8 @@ retryfs/
 ## Dependencies
 
 **Core:**
-- `github.com/go-git/go-billy/v5` - Filesystem interface
+- `github.com/absfs/absfs` - Filesystem interface
+- `github.com/absfs/memfs` - In-memory filesystem for testing
 
 **Metrics/Observability:**
 - `github.com/prometheus/client_golang` - Prometheus integration

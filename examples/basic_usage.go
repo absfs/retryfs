@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/absfs/memfs"
 	"github.com/absfs/retryfs"
-	"github.com/go-git/go-billy/v5/memfs"
 )
 
 func main() {

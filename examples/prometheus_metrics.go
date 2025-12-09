@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/absfs/memfs"
 	"github.com/absfs/retryfs"
-	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )

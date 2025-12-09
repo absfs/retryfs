@@ -444,7 +444,7 @@ if errors.Is(err, retryfs.ErrCircuitOpen) {
 
 ```go
 // Production-ready configuration
-func NewProductionRetryFS(backend billy.Filesystem) billy.Filesystem {
+func NewProductionRetryFS(backend absfs.FileSystem) absfs.FileSystem {
     // Configure retry policy
     policy := &retryfs.Policy{
         MaxAttempts: 5,

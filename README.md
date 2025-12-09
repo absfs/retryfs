@@ -9,7 +9,7 @@ Automatic retry with exponential backoff for network filesystems in the AbsFS ec
 
 ## Overview
 
-`retryfs` is a filesystem wrapper that provides automatic retry logic with configurable backoff strategies for unreliable or network-based filesystems. It implements the `billy.Filesystem` interface and transparently handles transient failures, making network filesystems more resilient without requiring application-level retry logic.
+`retryfs` is a filesystem wrapper that provides automatic retry logic with configurable backoff strategies for unreliable or network-based filesystems. It implements the `absfs.FileSystem` interface and transparently handles transient failures, making network filesystems more resilient without requiring application-level retry logic.
 
 Key features:
 - **Exponential backoff** with configurable parameters
@@ -63,7 +63,7 @@ Learn from success/failure patterns to optimize retry timing:
 
 Foundation for retry behavior:
 
-- Implement retry wrapper for billy.Filesystem interface
+- Implement retry wrapper for absfs.FileSystem interface
 - Exponential backoff with jitter algorithm
 - Configurable retry policies (per-operation and global)
 - Error classification system (retryable vs non-retryable)

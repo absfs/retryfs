@@ -7,8 +7,8 @@ import (
 	"log"
 	"time"
 
+	"github.com/absfs/memfs"
 	"github.com/absfs/retryfs"
-	"github.com/go-git/go-billy/v5/memfs"
 )
 
 // This example shows a complete production-ready setup
