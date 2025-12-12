@@ -53,6 +53,9 @@ const (
 	OpTruncate  Operation = "truncate"
 	OpSymlink   Operation = "symlink"
 	OpReadlink  Operation = "readlink"
+	OpReadDir   Operation = "readdir"
+	OpReadFile  Operation = "readfile"
+	OpSub       Operation = "sub"
 )
 
 // Policy defines the retry behavior

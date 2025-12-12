@@ -1,6 +1,7 @@
 package retryfs
 
 import (
+	"io/fs"
 	"math"
 	"math/rand"
 	"os"
@@ -356,16 +357,6 @@ func (rfs *RetryFS) Chown(name string, uid, gid int) error {
 	})
 }
 
-// Separator implements absfs.FileSystem
-func (rfs *RetryFS) Separator() uint8 {
-	return rfs.fs.Separator()
-}
-
-// ListSeparator implements absfs.FileSystem
-func (rfs *RetryFS) ListSeparator() uint8 {
-	return rfs.fs.ListSeparator()
-}
-
 // Chdir implements absfs.FileSystem
 func (rfs *RetryFS) Chdir(dir string) error {
 	return rfs.retry(OpChdir, func() error {
@@ -389,6 +380,27 @@ func (rfs *RetryFS) TempDir() string {
 func (rfs *RetryFS) Truncate(name string, size int64) error {
 	return rfs.retry(OpTruncate, func() error {
 		return rfs.fs.Truncate(name, size)
+	})
+}
+
+// ReadDir implements absfs.FileSystem
+func (rfs *RetryFS) ReadDir(name string) ([]fs.DirEntry, error) {
+	return retryWithResult(rfs, OpReadDir, func() ([]fs.DirEntry, error) {
+		return rfs.fs.ReadDir(name)
+	})
+}
+
+// ReadFile implements absfs.FileSystem
+func (rfs *RetryFS) ReadFile(name string) ([]byte, error) {
+	return retryWithResult(rfs, OpReadFile, func() ([]byte, error) {
+		return rfs.fs.ReadFile(name)
+	})
+}
+
+// Sub implements absfs.FileSystem
+func (rfs *RetryFS) Sub(dir string) (fs.FS, error) {
+	return retryWithResult(rfs, OpSub, func() (fs.FS, error) {
+		return rfs.fs.Sub(dir)
 	})
 }
 

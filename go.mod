@@ -1,9 +1,9 @@
 module github.com/absfs/retryfs
 
-go 1.25.4
+go 1.23.0
 
 require (
-	github.com/absfs/absfs v0.0.0-20251208163131-5313f0098c48
+	github.com/absfs/absfs v0.0.0-20251208232938-aa0ca30de832
 	github.com/absfs/memfs v0.0.0-20251208230836-c6633f45580a
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.2
@@ -21,4 +21,11 @@ require (
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	golang.org/x/sys v0.35.0 // indirect
 	google.golang.org/protobuf v1.36.8 // indirect
+)
+
+replace (
+	github.com/absfs/absfs => ../absfs
+	github.com/absfs/fstools => ../fstools
+	github.com/absfs/inode => ../inode
+	github.com/absfs/memfs => ../memfs
 )

@@ -3,6 +3,7 @@ package retryfs
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"math"
 	"os"
 	"syscall"
@@ -120,14 +121,6 @@ func (f *failingFS) Chown(name string, uid, gid int) error {
 	return f.fs.Chown(name, uid, gid)
 }
 
-func (f *failingFS) Separator() uint8 {
-	return f.fs.Separator()
-}
-
-func (f *failingFS) ListSeparator() uint8 {
-	return f.fs.ListSeparator()
-}
-
 func (f *failingFS) Chdir(dir string) error {
 	if f.shouldFail() {
 		return f.failError
@@ -151,6 +144,27 @@ func (f *failingFS) Truncate(name string, size int64) error {
 		return f.failError
 	}
 	return f.fs.Truncate(name, size)
+}
+
+func (f *failingFS) ReadDir(name string) ([]fs.DirEntry, error) {
+	if f.shouldFail() {
+		return nil, f.failError
+	}
+	return f.fs.ReadDir(name)
+}
+
+func (f *failingFS) ReadFile(name string) ([]byte, error) {
+	if f.shouldFail() {
+		return nil, f.failError
+	}
+	return f.fs.ReadFile(name)
+}
+
+func (f *failingFS) Sub(dir string) (fs.FS, error) {
+	if f.shouldFail() {
+		return nil, f.failError
+	}
+	return f.fs.Sub(dir)
 }
 
 // Symlink operations

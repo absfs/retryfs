@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"math/rand"
 	"os"
 	"sync"
@@ -190,16 +191,6 @@ func (c *chaosFS) Chown(name string, uid, gid int) error {
 	return c.fs.Chown(name, uid, gid)
 }
 
-// Separator implements absfs.FileSystem
-func (c *chaosFS) Separator() uint8 {
-	return c.fs.Separator()
-}
-
-// ListSeparator implements absfs.FileSystem
-func (c *chaosFS) ListSeparator() uint8 {
-	return c.fs.ListSeparator()
-}
-
 // Chdir implements absfs.FileSystem
 func (c *chaosFS) Chdir(dir string) error {
 	if c.shouldFail() {
@@ -227,6 +218,30 @@ func (c *chaosFS) Truncate(name string, size int64) error {
 		return errors.New("chaos: truncate failed")
 	}
 	return c.fs.Truncate(name, size)
+}
+
+// ReadDir implements absfs.FileSystem
+func (c *chaosFS) ReadDir(name string) ([]fs.DirEntry, error) {
+	if c.shouldFail() {
+		return nil, errors.New("chaos: readdir failed")
+	}
+	return c.fs.ReadDir(name)
+}
+
+// ReadFile implements absfs.FileSystem
+func (c *chaosFS) ReadFile(name string) ([]byte, error) {
+	if c.shouldFail() {
+		return nil, errors.New("chaos: readfile failed")
+	}
+	return c.fs.ReadFile(name)
+}
+
+// Sub implements absfs.FileSystem
+func (c *chaosFS) Sub(dir string) (fs.FS, error) {
+	if c.shouldFail() {
+		return nil, errors.New("chaos: sub failed")
+	}
+	return c.fs.Sub(dir)
 }
 
 // TestIntegration_ChaosMonkey tests retryfs with random failures
